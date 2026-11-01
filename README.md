@@ -1,5 +1,10 @@
 # agent-desktop
 
+> **Fork 維護指引（SanHsien/agent-desktop）**：
+> - 上游來源：ercel-labs/agent-desktop
+> - 整合架構規格手冊：[docs/agent-desktop-computer-use-spec.md](docs/agent-desktop-computer-use-spec.md)（涵蓋 Windows UIA、macOS AX、Linux AT-SPI2 映射、PowerShell 單引號防雷規範、以及 STALE_REF 重試安全處置合約）。
+> - 全系統 Agent Skill：已整合發布至 SanHsien/agent-assets 與全域技能目錄，支援 Antigravity、Claude Code、Codex、Hermes 跨平台調用。
+
 Computer use for AI agents: read and operate desktop apps through the OS accessibility tree.
 
 <p>
