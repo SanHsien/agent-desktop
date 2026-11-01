@@ -160,7 +160,7 @@ agent-desktop snapshot --app "記事本" -i
 
 ## 📋 支援命令索引
 
-`agent-desktop` 提供 60 個命令名稱（56 個即時作業命令）：
+`agent-desktop` 提供 60 個命令名稱與 56 個即時作業命令（It ships 60 command names, 56 operational commands. The other four (`key-down`, `key-up`, `mouse-down`, `mouse-up`) refuse to run until a daemon can release a held key or button）：
 
 | 分類群組 | 包含命令 | 核心功能 |
 |---|---|---|
@@ -172,6 +172,24 @@ agent-desktop snapshot --app "記事本" -i
 | **系統剪貼簿** | `clipboard-get`, `clipboard-set`, `clipboard-clear` | 安全讀取、寫入與清空系統剪貼簿內容 |
 | **工作階段與追蹤** | `wait`, `session`, `trace`, `cursor-overlay` | 延遲等待、追蹤錄製、除錯指標疊加層 |
 | **系統與環境** | `status`, `permissions`, `version`, `batch`, `skills` | 權限指引、版本資訊、批次執行封裝、內建 Skill 指令匯出 |
+
+---
+
+## 🔌 語言綁定（Language Bindings / FFI）
+
+各平台版本皆包含 C 函式庫 `libagent_desktop_ffi`（Windows 為 `agent_desktop_ffi.dll`），允許外部程式直接透過行程內記憶體呼叫，無需頻繁啟動 CLI 子程序：
+
+```python
+import ctypes
+lib = ctypes.CDLL("./lib/libagent_desktop_ffi.dylib")
+lib.ad_adapter_create.restype = ctypes.c_void_p
+lib.ad_adapter_destroy.argtypes = [ctypes.c_void_p]
+assert lib.ad_init(6) == 0  # AD_RESULT_OK when the header's AD_ABI_VERSION_MAJOR matches the library
+adapter = lib.ad_adapter_create()
+lib.ad_adapter_destroy(adapter)
+```
+
+---
 
 ---
 
