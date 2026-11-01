@@ -1,5 +1,12 @@
 # AGENTS.md
 
+> **Fork 維護指引（SanHsien/agent-desktop）**：
+> - 本 repo 為 `vercel-labs/agent-desktop` 的個人 Fork 倉庫。
+> - **PR、push、release 一律指向 `SanHsien/agent-desktop`，嚴禁推送到上游**。
+> - 開發與執行環境為 **Windows 11 原生（PowerShell）**，禁止假設 POSIX shell 語法。PowerShell 中傳遞 Ref 必須以單引號包裹（如 `'@s8f3k2p9:e12'`）。
+> - 本地門禁與衛生驗證入口：`pwsh -NoProfile -File tools/dev_check.ps1`。
+> - 完整 Fork 治理與決策詳見 [`FORK.md`](FORK.md)、[`docs/agent-desktop-computer-use-spec.md`](docs/agent-desktop-computer-use-spec.md) 與 [`docs/fork/`](docs/fork/)。
+
 Guidance for AI coding agents working in this repository.
 
 agent-desktop is a tool that AI agents invoke, not an agent. It is a Rust CLI and C library that reads native

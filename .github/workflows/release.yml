@@ -18,6 +18,7 @@ env:
 jobs:
   check-release:
     name: Check for new version
+    if: github.repository == 'vercel-labs/agent-desktop'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:

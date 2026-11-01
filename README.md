@@ -1,9 +1,11 @@
 # agent-desktop
 
 > **Fork 維護指引（SanHsien/agent-desktop）**：
-> - 上游來源：ercel-labs/agent-desktop
-> - 整合架構規格手冊：[docs/agent-desktop-computer-use-spec.md](docs/agent-desktop-computer-use-spec.md)（涵蓋 Windows UIA、macOS AX、Linux AT-SPI2 映射、PowerShell 單引號防雷規範、以及 STALE_REF 重試安全處置合約）。
-> - 全系統 Agent Skill：已整合發布至 SanHsien/agent-assets 與全域技能目錄，支援 Antigravity、Claude Code、Codex、Hermes 跨平台調用。
+> - 上游來源：[`vercel-labs/agent-desktop`](https://github.com/vercel-labs/agent-desktop)（沿用 Apache-2.0 授權與完整 Git 歷史）。
+> - 本 Fork 專屬維護說明：[`FORK.md`](FORK.md) ｜ 著作權與聲明：[`NOTICE.md`](NOTICE.md)。
+> - 整合架構規格手冊：[`docs/agent-desktop-computer-use-spec.md`](docs/agent-desktop-computer-use-spec.md)（涵蓋 Windows UIA、macOS AX、Linux AT-SPI2 映射、PowerShell 單引號防雷規範、以及 STALE_REF 重試安全處置合約）。
+> - 全系統 Agent Skill：已發布至 [`SanHsien/agent-assets`](https://github.com/SanHsien/agent-assets) 與全域技能目錄，支援 Antigravity、Claude Code、Codex、Hermes 跨平台調用。
+> - 本地門禁與品質檢驗：`pwsh -NoProfile -File tools/dev_check.ps1`。
 
 Computer use for AI agents: read and operate desktop apps through the OS accessibility tree.
 
