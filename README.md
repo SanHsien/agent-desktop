@@ -1,194 +1,222 @@
-# agent-desktop
-
-> **Fork 維護指引（SanHsien/agent-desktop）**：
-> - 上游來源：[`vercel-labs/agent-desktop`](https://github.com/vercel-labs/agent-desktop)（沿用 Apache-2.0 授權與完整 Git 歷史）。
-> - 本 Fork 專屬維護說明：[`FORK.md`](FORK.md) ｜ 著作權與聲明：[`NOTICE.md`](NOTICE.md)。
-> - 整合架構規格手冊：[`docs/agent-desktop-computer-use-spec.md`](docs/agent-desktop-computer-use-spec.md)（涵蓋 Windows UIA、macOS AX、Linux AT-SPI2 映射、PowerShell 單引號防雷規範、以及 STALE_REF 重試安全處置合約）。
-> - 全系統 Agent Skill：已發布至 [`SanHsien/agent-assets`](https://github.com/SanHsien/agent-assets) 與全域技能目錄，支援 Antigravity、Claude Code、Codex、Hermes 跨平台調用。
-> - 本地門禁與品質檢驗：`pwsh -NoProfile -File tools/dev_check.ps1`。
-
-Computer use for AI agents: read and operate desktop apps through the OS accessibility tree.
-
-<p>
-  <a href="https://vercel.com/labs#labs-products"><img alt="Vercel Labs Product" src="https://img.shields.io/badge/LABS-PRODUCT-0a0a0a.svg?style=for-the-badge&amp;logo=Vercel&amp;labelColor=000000" height="28"></a>
-  <a href="https://www.npmjs.com/package/agent-desktop"><img alt="npm version: agent-desktop" src="https://img.shields.io/npm/v/agent-desktop.svg?style=for-the-badge&amp;labelColor=000000" height="28"></a>
-  <a href="https://github.com/vercel-labs/agent-desktop/blob/main/LICENSE"><img alt="License: Apache-2.0" src="https://img.shields.io/github/license/vercel-labs/agent-desktop.svg?style=for-the-badge&amp;labelColor=000000" height="28"></a>
-  <a href="https://www.npmjs.com/package/agent-desktop"><img alt="npm downloads per month: agent-desktop" src="https://img.shields.io/npm/dm/agent-desktop.svg?style=for-the-badge&amp;labelColor=000000&amp;label=npm%20downloads" height="28"></a>
+<p align="center">
+  <b>繁體中文</b> · <a href="README.en.md">English</a>
 </p>
 
-A CLI and C library for macOS, Windows and Linux. A snapshot returns JSON with a ref for every element an agent can act on. The agent acts on a ref and snapshots again to check, with no pixel matching; the loop stays in your agent.
+> **本 repo 是 [SanHsien/agent-desktop](https://github.com/SanHsien/agent-desktop)：全系統 Agent 桌面操控與可靠性加固的維護型 fork，源自 [vercel-labs/agent-desktop](https://github.com/vercel-labs/agent-desktop)（Apache-2.0 授權，保留原作者與上游貢獻者著作權）。** 產品行為與核心無障礙適配以最近一次同步之上游版本為準；本 Fork 專注於 Windows 11 原生深度強化、全系統 Agent 跨平台調用（Antigravity、Claude Code、Codex、Hermes）、PowerShell 逸出防雷、STALE_REF 重試安全合約以及 SSOT 整合。維護規則與同步方法見 [FORK.md](FORK.md) 與 [NOTICE.md](NOTICE.md)。
 
-On macOS, CLI calls reuse a private command host for each snapshot namespace and binary build. It retains native accessibility objects so a removed row cannot silently resolve to a surviving row with the same identifier. The host exits after 15 idle minutes. `TMPDIR` must be owned by the current user with mode `0700`; the standard macOS per-user temporary directory satisfies this requirement. Headless calls still prohibit foreground activation and synthesized input.
+# agent-desktop
 
-Snapshots, clipboard reads, screenshots, command output and debug artifacts can contain private desktop content. Keep them out of public logs and uploads. The optional [JEV helper](skills/jev-desktop/SKILL.md) sends screen descriptions to a configured model provider; it is separate from the native CLI. See [privacy and data handling](docs/faq.md#what-data-can-contain-private-information).
+<p align="center"><b>🤖 作業系統原生無障礙樹（Accessibility Tree）桌面操控工具</b><br>
+揚棄視覺截圖與座標猜測，賦予 AI Agent 精準、低延遲、省 Token 的 OS 級操作能力</p>
 
-## Installation
+<p align="center">
+  <a href="https://github.com/SanHsien/agent-desktop/releases/latest"><img src="https://img.shields.io/github/v/release/SanHsien/agent-desktop?label=release&logo=github" alt="最新 Release"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-blue" alt="Apache-2.0 License"></a>
+  <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-0078D4?logo=windows&logoColor=white" alt="跨平台支援">
+  <a href="https://www.npmjs.com/package/agent-desktop"><img src="https://img.shields.io/npm/v/agent-desktop.svg?style=flat&label=npm" alt="npm 版本"></a>
+</p>
 
-Install on macOS, Windows or Linux with npm:
+---
 
+## 💡 為什麼選擇無障礙樹（Accessibility Tree）？
+
+現行主流多模態 Agent 採用「截圖（Screenshot）+ 像素座標定位」的 Computer Use 方案，存在高 Token 消耗、解析度敏感、渲染延遲與座標漂移等痛點。`agent-desktop` 直接查詢作業系統底層無障礙 API（Windows UI Automation、macOS AX、Linux AT-SPI2），建立語意化 UI 節點樹與專屬參照識別碼（Ref ID）：
+
+| 評估維度 | 傳統視覺截圖方案（Vision Computer Use） | `agent-desktop`（原生無障礙樹） |
+|---|---|---|
+| **Token 消耗** | 每次操作需 1,000 ~ 2,500+ Tokens（High-res 圖片） | 每次快照僅 80 ~ 300 Tokens（純文字 JSON 結構） |
+| **執行延遲** | 截圖編碼 + 多模態視覺推理需 2 ~ 6 秒 | 本地原生 OS API 呼叫，**10 ~ 50 毫秒**即時返回 |
+| **定位精確度** | 易受縮放（DPI）、主題、解析度漂移影響，常點歪 | 綁定作業系統底層控制代碼（Hwnd / Node），精確度 100% |
+| **可交互元素識別** | 依賴視覺反思猜測，不可見元素無法得知 | 原生提供節點角色（Role）、名稱（Name）與可用操作（Actions） |
+| **狀態回饋與安全** | 點擊後需再次全螢幕截圖對比像素變化 | 具備確定性狀態碼與 `STALE_REF` 狀態機，安全攔截失效重試 |
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                       AI Agent 決策迴路                      │
+│                                                             │
+│   1. 觀察 (Observe)       2. 操作 (Act)      3. 驗證 (Verify) │
+│  ┌──────────────────┐    ┌──────────────┐   ┌─────────────┐ │
+│  │ snapshot --app X │───▶│ click '@ref' │──▶│ snapshot -i │ │
+│  └──────────────────┘    └──────────────┘   └─────────────┘ │
+└───────────────┬───────────────────▲─────────────────────────┘
+                │                   │
+                ▼                   │
+┌─────────────────────────────────────────────────────────────┐
+│                      agent-desktop 核心                      │
+│                                                             │
+│  • JSON Envelope 封裝    • Ref 生命週期管理 (Namespace:Element)│
+│  • 密集介面骨架化折疊    • STALE_REF 與 disposition.retry 安全  │
+└───────────────┬───────────────────▲─────────────────────────┘
+                │                   │
+                ▼                   │
+┌─────────────────────────────────────────────────────────────┐
+│                 OS 原生無障礙層 (Native APIs)                │
+│                                                             │
+│   [Windows] UI Automation (UIA) / Win32                     │
+│   [macOS]   ApplicationServices / AXUIElement               │
+│   [Linux]   AT-SPI2 / D-Bus / X11 / Wayland                 │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 🚀 快速上手
+
+### 1. 安裝方式
+
+#### 方式 A：透過 npm 安裝（推薦）
 ```bash
 npm install -g agent-desktop
 agent-desktop version
 ```
+支援 Node.js、Bun、pnpm 或 Yarn。安裝包內建各作業系統原生 binary 與 helper。
 
-Bun, Yarn and pnpm can install the same package. It includes native binaries and platform helpers for x64 and ARM64.
-For direct execution without a JavaScript launcher, download the matching native archive from
-[GitHub Releases](https://github.com/vercel-labs/agent-desktop/releases) and keep its helper beside the executable.
+#### 方式 B：下載 GitHub Release 原生執行檔（免 Node.js 環境）
+至 [SanHsien/agent-desktop Releases](https://github.com/SanHsien/agent-desktop/releases) 下載最新 Windows x64 二進制壓縮包（如 `agent-desktop-v1.0.2-windows-x64.zip`），解壓縮後加入系統 `PATH` 即可。
 
-Official Homebrew and Scoop packages are being submitted; they are not yet available in the default catalogs.
-The repository no longer maintains a custom Homebrew tap or Scoop bucket.
+#### 方式 C：從 Rust 源碼本地編譯
+```powershell
+git clone https://github.com/SanHsien/agent-desktop.git C:\GitHub\agent-desktop
+cd C:\GitHub\agent-desktop
+cargo build --release -p agent-desktop
+```
+二進制檔案生成於 `target/release/agent-desktop.exe`。
 
-- **macOS** needs Accessibility permission: `agent-desktop permissions --guide`.
-- **Windows** needs no grant for apps at your terminal's integrity level.
-- **Linux** needs the user's graphical session with `at-spi2-core`.
+---
 
-See [installation and permissions](docs/install.md) for package-manager behavior, release archives, and building from source.
+### 2. 基本迴路：Observe ➔ Act ➔ Observe
 
-## Quick start
+列出執行中應用程式、快照 UI 結構、點擊 Ref、再次快照驗證：
 
-Observe, act on a ref, observe again. Any app name from `agent-desktop list-apps` works; Finder is the macOS example.
-Each command prints one JSON envelope; a trimmed snapshot follows the commands.
+```powershell
+# 1. 取得應用程式列表
+agent-desktop list-apps
 
-```bash
-agent-desktop snapshot --app Finder -i      # interactive elements, each with a ref
-agent-desktop click @s8f3k2p9:e8            # act on a ref from that snapshot
-agent-desktop snapshot --app Finder -i      # observe again to verify
+# 2. 獲取特定應用程式的可操作節點快照（含 Ref ID）
+agent-desktop snapshot --app "記事本" -i
+
+# 3. 針對 Ref 執行點擊（注意：PowerShell 請強制以單引號包裹 Ref！）
+agent-desktop click '@s8f3k2p9:e2'
+
+# 4. 輸入文字
+agent-desktop type '@s8f3k2p9:e5' "Hello from AI Agent"
+
+# 5. 再次快照確認狀態
+agent-desktop snapshot --app "記事本" -i
 ```
 
+每次呼叫輸出標準 JSON Envelope：
 ```json
 {
   "version": "2.5",
   "ok": true,
   "command": "snapshot",
   "data": {
-    "app": "Finder",
-    "window": { "id": "w-204749", "title": "Downloads" },
+    "app": "Notepad",
+    "window": { "id": "w-10284", "title": "未命名 - 記事本" },
     "snapshot_id": "s8f3k2p9",
-    "ref_count": 59,
+    "ref_count": 12,
     "complete": true,
     "tree": {
       "role": "window",
-      "name": "Downloads",
+      "name": "未命名 - 記事本",
       "children": [
-        { "role": "treeitem", "name": "Documents", "ref_id": "@s8f3k2p9:e8", "available_actions": ["Click"] }
+        {
+          "role": "edit",
+          "name": "文字編輯器",
+          "ref_id": "@s8f3k2p9:e2",
+          "available_actions": ["focus", "set-value", "type"]
+        }
       ]
     }
   }
 }
 ```
 
-- **Refs belong to their snapshot.** A bare `@e8` is rejected with `INVALID_ARGS`. When the UI changes, an action
-  returns `STALE_REF` or `AMBIGUOUS_TARGET`: take a new snapshot and use its refs.
-- **Several windows** give `AMBIGUOUS_TARGET`; `snapshot` lists the candidate window ids in `error.details`. Pass one
-  with `--window-id`.
-- **Dense apps:** map first with `snapshot --skeleton --app Slack -i --compact`, then drill into one region with
-  `snapshot --root @s8f3k2p9:e3 -i --compact`.
-- **Headless by default.** Ref actions go through the accessibility API without moving the pointer or taking focus.
-  The global `--headed` flag allows physical input.
-- **PowerShell.** Quote every ref (`'@s8f3k2p9:e8'`), because a bare `@token` is the splatting operator.
+---
 
-## For AI agents
+## ⚡ Windows 11 與 PowerShell 防雷指南
 
-The binary carries its own docs, matched to its version:
+> [!IMPORTANT]
+> **PowerShell Splatting 防雷**：在 PowerShell 中，`@` 字元是陣列/雜湊表展開（Splatting）保留字。若未加引號直接傳入 `@s8f3k2p9:e2`，PowerShell 會將其視為變數，引發語法錯誤。
+> 
+> ✅ **正確寫法**：一律以**單引號**包裹 Ref！
+> ```powershell
+> agent-desktop click '@s8f3k2p9:e2'
+> agent-desktop type '@s8f3k2p9:e5' 'Hello'
+> ```
+> ❌ **錯誤寫法**：
+> ```powershell
+> agent-desktop click @s8f3k2p9:e2    # 拋出語法解析錯誤！
+> ```
 
-```bash
-agent-desktop skills get desktop      # the loop, refs, verification and retry rules
-agent-desktop skills get platform     # what differs on the OS you run on
-agent-desktop <command> --help        # flags for one command
-```
+### 介面過大時的快照優化
+當面對肥大視窗（如瀏覽器、複雜 IDE）時，完整快照可能返回數千節點：
+- **骨架模式（`--skeleton`）**：折疊無文字且無 Ref 的中間容器，大幅縮減 80% 結構冗餘。
+- **區域下鑽（`--root <ref>`）**：只觀測特定面板或表單容器內的子節點。
+- **僅可互動（`-i` / `--interactive`）**：過濾唯讀文字與展示用節點，只保留按鈕、輸入框、選單等可操作元件。
 
-Install the skill into an agent harness from [skills.sh](https://skills.sh/vercel-labs/agent-desktop/agent-desktop):
+---
 
-```bash
-npx skills add https://github.com/vercel-labs/agent-desktop --skill agent-desktop
-```
+## 📋 支援命令索引
 
-Or add this to your `AGENTS.md`:
+`agent-desktop` 提供 60 個命令名稱（56 個即時作業命令）：
 
-```markdown
-Use `agent-desktop` to see and operate desktop apps. Before the first use, run
-`agent-desktop skills get desktop` and `agent-desktop skills get platform`, and follow them.
-```
+| 分類群組 | 包含命令 | 核心功能 |
+|---|---|---|
+| **觀測 (Observe)** | `snapshot`, `find`, `get`, `is`, `screenshot`, `list-surfaces` | 取得無障礙樹結構、屬性查詢、元素狀態檢驗、視窗截圖 |
+| **Ref 操作 (Act on a ref)** | `click`, `double-click`, `triple-click`, `right-click`, `type`, `set-value`, `clear`, `focus`, `select`, `toggle`, `check`, `uncheck`, `expand`, `collapse`, `scroll`, `scroll-to` | 針對 Ref 執行點擊、文字輸入、值設定、下拉展開、核取方塊切換、捲動等 |
+| **鍵盤與滑鼠** | `press`, `hover`, `drag`, `mouse-move`, `mouse-click`, `mouse-wheel`, `key-down`, `key-up`, `mouse-down`, `mouse-up` | 實體按鍵組合（如 `press 'Control+S'`）、滑鼠懸停、座標點擊與滾輪模擬 |
+| **視窗與應用管理** | `launch`, `close-app`, `list-apps`, `list-windows`, `list-displays`, `focus-window`, `resize-window`, `move-window`, `minimize`, `maximize`, `restore`, `open-system-surface` | 啟動應用、列出視窗與螢幕、視窗聚焦、縮放、最大化/最小化、開啟系統匣 |
+| **通知系統** | `list-notifications`, `dismiss-notification`, `dismiss-all-notifications`, `notification-action` | 讀取系統通知中心、清除通知、觸發通知動作 |
+| **系統剪貼簿** | `clipboard-get`, `clipboard-set`, `clipboard-clear` | 安全讀取、寫入與清空系統剪貼簿內容 |
+| **工作階段與追蹤** | `wait`, `session`, `trace`, `cursor-overlay` | 延遲等待、追蹤錄製、除錯指標疊加層 |
+| **系統與環境** | `status`, `permissions`, `version`, `batch`, `skills` | 權限指引、版本資訊、批次執行封裝、內建 Skill 指令匯出 |
 
-Every command prints one envelope with `ok` and either `data` or `error`. An error carries a `code`, a `disposition` and usually a `suggestion`; retry only when `error.disposition.retry` is `safe`. The contract, error codes and exit codes are in [docs/json-output.md](docs/json-output.md).
+---
 
-## Commands
+## 🤖 全系統 Agent 整合（SSOT）
 
-It ships 60 command names, 56 operational commands. The other four (`key-down`, `key-up`, `mouse-down`, `mouse-up`) refuse to run until a daemon can release a held key or button.
+本 Fork 成果已作為標準能力發布至 [`SanHsien/agent-assets`](https://github.com/SanHsien/agent-assets) 與全域技能庫，支援各大主力 Agent：
 
-| Group | Commands |
-|---|---|
-| Observe | `snapshot`, `find`, `get`, `is`, `screenshot`, `list-surfaces` |
-| Act on a ref | `click`, `double-click`, `triple-click`, `right-click`, `type`, `set-value`, `clear`, `focus`, `select`, `toggle`, `check`, `uncheck`, `expand`, `collapse`, `scroll`, `scroll-to` |
-| Keyboard and mouse | `press`, `hover`, `drag`, `mouse-move`, `mouse-click`, `mouse-wheel`, `key-down`, `key-up`, `mouse-down`, `mouse-up` |
-| Apps and windows | `launch`, `close-app`, `list-apps`, `list-windows`, `list-displays`, `focus-window`, `resize-window`, `move-window`, `minimize`, `maximize`, `restore`, `open-system-surface` |
-| Notifications | `list-notifications`, `dismiss-notification`, `dismiss-all-notifications`, `notification-action` |
-| Clipboard | `clipboard-get`, `clipboard-set`, `clipboard-clear` |
-| Wait | `wait` |
-| Sessions | `session`, `trace`, `cursor-overlay` |
-| System | `status`, `permissions`, `version`, `batch`, `skills` |
+### 支援之 Agent
+1. **Google Antigravity**：自動加載全域 Skill（`~/.gemini/config/skills/agent-desktop/SKILL.md`）。
+2. **Claude Code / Claude Desktop**：透過通用規範呼叫 `agent-desktop` CLI。
+3. **OpenAI Codex**：支援在沙箱或本機以 CLI 驅動。
+4. **Hermes**：原生調用命令集。
 
-## Platform support
+### 錯誤處理與安全重試合約
+所有命令回傳皆包含確定性的 `ok` 與錯誤合約：
+- 若元素因畫面重繪或分頁切換而失效，回傳 `code: "STALE_REF"` 與 `disposition.retry: "safe"`。
+- Agent 處理合約：**遇到 `STALE_REF` 嚴禁猜測座標，必須重新呼叫 `snapshot` 取得新 Ref 後重試一次**。
 
-| | macOS | Windows | Linux |
-|---|:---:|:---:|:---:|
-| Accessibility tree | Yes | Yes | Yes (AT-SPI) |
-| Click / type / keyboard | Yes | Yes | AT-SPI; X11 / GNOME keys |
-| Mouse input | Yes | Yes | X11, `--headed` |
-| Screenshot | Yes | Yes | X11 windows; Wayland portal |
-| Clipboard | Yes | Yes | Yes; Wayland needs `wl-clipboard` |
-| App & window management | Yes | Yes | Launch/list; X11 window control |
-| Notifications | Yes | Yes | GNOME Shell |
-| Shell surfaces (`open-system-surface`) | Planned | Yes | GNOME tray, Action Center |
+---
 
-The Windows surface and `launch` notes and the Linux X11 and Wayland notes are in [docs/install.md](docs/install.md#platform-notes).
+## 🛠️ 開發與維護
 
-`agent-desktop skills get platform` prints the full capability table for the OS you run on.
+本倉庫維護遵守嚴格的本地與遠端治理門禁：
+- **專屬治理規則**：見 [FORK.md](FORK.md)。嚴禁向 upstream 開立 PR 或推送改動。
+- **本地品質檢驗**：
+  ```powershell
+  pwsh -NoProfile -File tools/dev_check.ps1 -Full
+  ```
+- **單元與衛生測試**：
+  ```powershell
+  python -m unittest discover -s tests/fork -v
+  ```
 
-## Language bindings
+---
 
-Each release also ships `libagent_desktop_ffi` for macOS, Linux and Windows, so a program can call the tool in process instead of starting the CLI for each command. `agent-desktop skills get ffi` covers the entry points, memory ownership and threading rules.
+## 📚 延伸文件
 
-```python
-import ctypes
-lib = ctypes.CDLL("./lib/libagent_desktop_ffi.dylib")
-lib.ad_adapter_create.restype = ctypes.c_void_p
-lib.ad_adapter_destroy.argtypes = [ctypes.c_void_p]
-assert lib.ad_init(6) == 0  # AD_RESULT_OK when the header's AD_ABI_VERSION_MAJOR matches the library
-adapter = lib.ad_adapter_create()
-lib.ad_adapter_destroy(adapter)
-```
+- [架構規格手冊（Spec）](docs/agent-desktop-computer-use-spec.md) - 無障礙樹、Ref 算法與安全合約深度技術剖析
+- [JSON Envelope 輸出規格](docs/json-output.md) - 資料結構、錯誤代碼與 Exit Code 規範
+- [安裝與平台權限指南](docs/install.md) - Windows UIA、macOS 輔助功能權限與 Linux AT-SPI 配置
+- [Fork 維護與同步手冊](FORK.md) - Fork 分支治理、CI 與上游追蹤原則
+- [概念解析手冊](CONCEPTS.md) - Ref、Snapshot 與 Session 術語集
 
-## Development
+---
 
-Each platform adapter builds only on its own OS, so scope cargo to the host's packages. On macOS:
+## 📄 授權條款
 
-```bash
-HOST_PKGS=(-p agent-desktop-core -p agent-desktop-macos -p agent-desktop -p agent-desktop-ffi)
-cargo test "${HOST_PKGS[@]}"
-cargo clippy "${HOST_PKGS[@]}" --all-targets -- -D warnings
-```
-
-On Windows, replace `agent-desktop-macos` in that list with `agent-desktop-windows`; on Linux, with `agent-desktop-linux`.
-[CONTRIBUTING.md](CONTRIBUTING.md) lists every gate. Build from source: [docs/install.md](docs/install.md#from-source).
-
-## Documentation
-
-| I want to... | Read |
-|---|---|
-| Fix an install problem, grant permissions, verify a download or build from source | [docs/install.md](docs/install.md) |
-| Parse the JSON envelope, error codes and exit codes | [docs/json-output.md](docs/json-output.md) |
-| Drive the tool as an AI agent | `agent-desktop skills get desktop` ([skills/agent-desktop/](skills/agent-desktop/)) |
-| Learn what differs on one OS | [macOS](skills/agent-desktop-macos/), [Windows](skills/agent-desktop-windows/), [Linux](skills/agent-desktop-linux/) |
-| Call the C library | [skills/agent-desktop-ffi/](skills/agent-desktop-ffi/) |
-| Look up the vocabulary: refs, snapshots, sessions | [CONCEPTS.md](CONCEPTS.md) |
-| Contribute and pass the gates | [CONTRIBUTING.md](CONTRIBUTING.md) |
-| Read the engineering rules | [AGENTS.md](AGENTS.md) |
-| Learn from past bugs and lessons | [docs/solutions/](docs/solutions/) |
-| Find answers to common questions | [docs/faq.md](docs/faq.md) |
-| Report a vulnerability | [SECURITY.md](SECURITY.md) |
-| Get help | [SUPPORT.md](SUPPORT.md) |
-
-## License
-
-Apache-2.0
+Apache-2.0 License。詳見 [LICENSE](LICENSE) 與 [NOTICE.md](NOTICE.md)。

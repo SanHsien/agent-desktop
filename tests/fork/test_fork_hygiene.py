@@ -4,7 +4,7 @@
 test_fork_hygiene.py
 
 Fork 衛生與治理規則檢查：
-驗證維護文件完整性、UTF-8 編碼、Git remote 設定、以及 CI 發布守衛。
+驗證維護文件完整性、雙語 README、UTF-8 編碼、Git remote 設定、以及 CI 發布守衛。
 """
 
 import os
@@ -22,6 +22,7 @@ class TestForkHygiene(unittest.TestCase):
             "NOTICE.md",
             "AGENTS.md",
             "README.md",
+            "README.en.md",
             "docs/agent-desktop-computer-use-spec.md",
             "docs/fork/UPSTREAM.md",
             "docs/fork/DECISIONS.md",
@@ -32,12 +33,20 @@ class TestForkHygiene(unittest.TestCase):
             file_path = REPO_ROOT / rel_path
             self.assertTrue(file_path.is_file(), f"Missing required fork document: {rel_path}")
 
+    def test_bilingual_readme_links(self):
+        readme_zh = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+        readme_en = (REPO_ROOT / "README.en.md").read_text(encoding="utf-8")
+
+        self.assertIn("README.en.md", readme_zh, "README.md 應包含切換至 README.en.md 的連結")
+        self.assertIn("README.md", readme_en, "README.en.md 應包含切換至 README.md 的連結")
+
     def test_all_fork_files_are_valid_utf8(self):
         check_files = [
             "FORK.md",
             "NOTICE.md",
             "AGENTS.md",
             "README.md",
+            "README.en.md",
             "docs/agent-desktop-computer-use-spec.md",
             "docs/fork/UPSTREAM.md",
             "docs/fork/DECISIONS.md",
