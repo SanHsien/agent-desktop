@@ -1,11 +1,16 @@
 {
   "repo": "https://github.com/vercel-labs/agent-desktop.git",
   "branch": "main",
-  "reviewed_through": "9eb9b296192fcb70bda25e918cd6dd66abfa3d0d",
+  "track": "release",
+  "ticket_cutoff": "release",
+  "reviewed_through": "a47ed664e0db00d1d4df364eb3fe8a5599882f3c",
+  "reviewed_release": "v1.0.2",
   "reviewed_date": "2026-11-02",
-  "reviewed_pr_through": 0,
-  "reviewed_issue_through": 0,
-  "track": "commit",
+  "reviewed_pr_through": 476,
+  "reviewed_issue_through": 465,
   "decision_log": "docs/fork/DECISIONS.md",
-  "notes": "2026-11-02 onboarding. Commit axis: the fork is upstream/main 9eb9b296 (Video remove, #421) plus 7 fork commits (git rev-list --left-right --count HEAD...upstream/main = 7 0, merge-base equals the upstream tip), so nothing upstream is pending. PR and issue axes start at 0 on purpose: nobody has triaged them, and a merged PR number is not evidence of arrival here because upstream merges stacked PRs into non-main branches (#445 and #447 merged into laf/identity-linux-windows). Raise the watermarks only after triaging in steps, lowest numbers first."
+  "monitored": [
+    {"item": "pr#456", "head": "c3732813d41bb2d3e719a8a915006da2c444ec11", "state": "open"},
+    {"item": "pr#400", "head": "e721d98cb1b983bda3657c4655b36829dc1a7732", "state": "open"}
+  ]
 }

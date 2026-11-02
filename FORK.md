@@ -14,12 +14,12 @@
    - 制定 PowerShell `@ref` splatting 展開防呆語法（強制單引號包裹 `'@ref'`）。
    - 嚴格落實 `STALE_REF` 狀態機與處置重試安全合約（Disposition Retry Contract），杜絕 GUI 自動化常見的 Doom Loop 無限重試。
 3. **保持與上游同步**：
-   - 完整追蹤 `upstream/main`（Rust Core 與平台介面更新），在保留上游所有原生能力的同時，建立個人維護與品質保證體系。
+   - 完整追蹤 `upstream/main`（Rust Core 與平台介面更新），在保留上游所有原生能力的同時，建立個人維護與品質保證體系。每週 Upstream check 只在上游出 release 時要求審查（`track: release`，見 DECISIONS ADR-007），release 之間的 main commit 由同步時手動 `git log HEAD..upstream/main` 檢視。
 
 **回貢判準**：
 - 修的是上游 Rust Core、平台 Adapter 或 CLI 的 bug，經本地驗證後提 PR 回貢上游 `vercel-labs/agent-desktop`。
 - 本 fork 獨創之跨 Agent 規格書、全域 Skill 整合、Windows PowerShell 維護骨架與 CI 衛生門禁則留在本 fork。
-- 回貢前必須在當次對話取得維護者（主人）明確同意；「fork」、「建環境」均不代表同意。
+- 回貢前必須在當次對話取得維護者明確同意；「fork」、「建環境」均不代表同意。
 
 ---
 
@@ -37,11 +37,13 @@
 | `.github/workflows/release.yml` | 加上 `if: github.repository == 'vercel-labs/agent-desktop'` 防護，防止在 fork 上意外觸發上游發布作業 |
 | `.cursor/rules/no-upstream-pr.mdc` | 本地編輯器防呆：防止誤對上游倉庫開 PR 或推送 |
 | `ROADMAP.md` | 本 fork 之後要做什麼的單一真相源 |
-| `tools/check_upstream_updates.py`、`tools/upstream_baseline.json`、`.github/workflows/upstream-check.yml` | 每週列出上游水位之後的新 commit、PR、issue；檢查器為艦隊標準版，差異只放 baseline |
+| `tools/check_upstream_updates.py`、`tools/upstream_baseline.json`、`.github/workflows/upstream-check.yml` | 每週列出上游水位之後的新 commit、PR、issue；檢查器為艦隊標準版（目前與 `repo-fleet-ops` 正本同版，sha1 `c484ddbc…`，正本更新後再換），差異只放 baseline |
 | `tools/check_dependency_freshness.py`、`.github/dependency-deferrals.json`、`.github/workflows/dependency-freshness.yml` | 每月比對 Cargo 與 Actions 宣告的下限和現行版 |
 | `tests/fork/test_fork_tools.py` | 上述兩支檢查器與其接線的性質測試 |
 
-上游持有的程式碼（`crates/`、`src/`、`apps/`、`npm/`）原樣保留，上游主要文檔以英文為準。
+上游持有的程式碼（`crates/`、`src/`、`apps/`、`npm/`）**不是**原樣保留：本 fork 在 `crates/`、`src/` 帶著 Windows 修正（`8d372752`、`0f7e8e65`、`a67bf683`），與上游 `main` 差 32 個產品檔（2026-11-02 `git diff --name-only upstream/main HEAD -- crates src apps npm`）。逐檔清單與移除條件尚未整理。
+
+本 fork 的 `v1.0.2` tag 指向 fork 自己的 `5d82883d`，與上游的 `v1.0.2`（`a47ed664`）同名不同物：`5d82883d` 的產品檔與上游 `main` `9eb9b296`（上游 release 之後）相同，與上游 `v1.0.2` 差 93 個產品檔（`git rev-parse v1.0.2`、`git ls-remote upstream 'refs/tags/v1.0.2*'`）。見 [`docs/fork/DECISIONS.md`](docs/fork/DECISIONS.md) ADR-007。上游主要文檔以英文為準。
 
 ---
 

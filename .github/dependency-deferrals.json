@@ -1,9 +1,41 @@
 {
   "_comment": "Reviewed-but-not-now decisions for tools/check_dependency_freshness.py. Each entry needs deferredLatest and reason; it expires by itself once the registry passes that release. A permanent policy belongs on the declaring line as `# freshness-hold:` instead.",
   "deferrals": {
+    "futures-util": {
+      "deferredLatest": "0.3.34",
+      "reason": "Exact pin in crates/linux/Cargo.toml, a file this fork leaves identical to upstream/main (git diff upstream/main HEAD -- crates/linux is empty). No deny.toml or changelog reason is recorded; the only ground is ownership. Reviewed 2026-11-02 at 0.3.34 (docs/fork/DECISIONS.md, ADR-006 point 3)."
+    },
+    "rustix": {
+      "deferredLatest": "1.1.6",
+      "reason": "Exact pin in crates/linux/Cargo.toml, a file this fork leaves identical to upstream/main (git diff upstream/main HEAD -- crates/linux is empty). No deny.toml or changelog reason is recorded; the only ground is ownership. Reviewed 2026-11-02 at 1.1.6 (docs/fork/DECISIONS.md, ADR-006 point 3)."
+    },
     "zbus": {
       "deferredLatest": "6.2.1",
       "reason": "crates/linux pins zbus =5.19.0. deny.toml records why: 5.19 is the newest release with the blocking API the Linux adapter uses, and the three RUSTSEC-2026-0370..0372 ignores go away when the adapter moves to zbus 6. Taken from deny.toml; not re-verified against the zbus 6 changelog. Recorded 2026-11-02 at 6.2.1."
+    },
+    "actions/download-artifact": {
+      "deferredLatest": "8.0.2",
+      "reason": "Pin in upstream-owned workflow files that this fork leaves identical to upstream/main on the pinned lines; the floor moves when the fork syncs upstream. Reviewed 2026-11-02 at 8.0.2 (docs/fork/DECISIONS.md, ADR-006 point 3)."
+    },
+    "actions/setup-node": {
+      "deferredLatest": "7.1.0",
+      "reason": "Pin in upstream-owned workflow files that this fork leaves identical to upstream/main on the pinned lines; the floor moves when the fork syncs upstream. Reviewed 2026-11-02 at 7.1.0 (docs/fork/DECISIONS.md, ADR-006 point 3)."
+    },
+    "actions/setup-python": {
+      "deferredLatest": "7.1.0",
+      "reason": "Pin in upstream-owned workflow files that this fork leaves identical to upstream/main on the pinned lines; the floor moves when the fork syncs upstream. Reviewed 2026-11-02 at 7.1.0 (docs/fork/DECISIONS.md, ADR-006 point 3)."
+    },
+    "actions/upload-artifact": {
+      "deferredLatest": "7.0.2",
+      "reason": "Pin in upstream-owned workflow files that this fork leaves identical to upstream/main on the pinned lines; the floor moves when the fork syncs upstream. Reviewed 2026-11-02 at 7.0.2 (docs/fork/DECISIONS.md, ADR-006 point 3)."
+    },
+    "github/codeql-action/analyze": {
+      "deferredLatest": "4.39.1",
+      "reason": "Pin in upstream-owned workflow files that this fork leaves identical to upstream/main on the pinned lines; the floor moves when the fork syncs upstream. Reviewed 2026-11-02 at 4.39.1 (docs/fork/DECISIONS.md, ADR-006 point 3)."
+    },
+    "github/codeql-action/init": {
+      "deferredLatest": "4.39.1",
+      "reason": "Pin in upstream-owned workflow files that this fork leaves identical to upstream/main on the pinned lines; the floor moves when the fork syncs upstream. Reviewed 2026-11-02 at 4.39.1 (docs/fork/DECISIONS.md, ADR-006 point 3)."
     }
   }
 }

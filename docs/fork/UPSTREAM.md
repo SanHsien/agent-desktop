@@ -26,8 +26,8 @@ gh repo set-default --view
 ## 2. 上游變更拉取與比對
 
 ```powershell
-# 1. 抓取上游最新 commit 與 tags
-git fetch upstream --tags
+# 1. 抓取上游最新 commit（不抓 tag：本 fork 的 v1.0.2 與上游同名不同物，見 DECISIONS ADR-007）
+git fetch upstream --no-tags
 
 # 2. 檢視上游相較於本地 main 的新增 commit 清單
 git log --oneline HEAD..upstream/main
@@ -49,7 +49,7 @@ git status
 git merge upstream/main
 
 # 3. 若有衝突：
-# - 上游程式碼檔案（crates/、src/、npm/）：一律以上游最新為準，衝突解決後重測。
+# - 上游程式碼檔案（crates/、src/、npm/）：先看衝突是否落在本 fork 的 Windows 修正（8d372752、0f7e8e65、a67bf683）；上游已有等效修正才取上游，否則保留，衝突解決後在 Windows 重測。
 # - 本 fork 專屬維護檔案（FORK.md、NOTICE.md、docs/agent-desktop-computer-use-spec.md、tools/、docs/fork/）：保留本地版本。
 
 # 4. 執行本地門禁驗證
@@ -71,7 +71,10 @@ git push origin main
 | 1 | `--strict` 且有待審 |
 | 2 | 檢查沒做完（`git`／`gh` 失敗、清單到上限還沒碰到水位、上游改寫歷史）；**不是**「沒有新東西」 |
 
-- `reviewed_through`：已審到的上游 commit。2026-11-02 起點是 `9eb9b296`（本 fork 的分叉點，即上游 `main` 的 tip），`git rev-list --left-right --count HEAD...upstream/main` 為 `7 0`。
-- `reviewed_pr_through`、`reviewed_issue_through`：起點刻意是 0，因為沒有人審過；提高水位前先把結論寫進 `docs/fork/DECISIONS.md`，並依 `ROADMAP.md` 的分批順序走。
+- `track: release` 加 `ticket_cutoff: release`：上游幾天就有數十筆 PR／issue，只在新 release 出現時才要求審查；release 之後才開的項目留到下一輪。
+- `reviewed_through`／`reviewed_release`：已審到的上游 release。2026-11-02 起點是 `v1.0.2`（`a47ed664`）；commit 軸另記：本 fork 是上游 `main` `9eb9b296` 加自己的 commit，上游沒有未併入的 commit。
+- `reviewed_pr_through`（#476）、`reviewed_issue_through`（#465）：2026-11-02 以 `state=all` 讀 API 的當時最大號，結論逐項寫在 [`DECISIONS.md`](DECISIONS.md) ADR-007；不是「沒看過就設成最大號」。
+- `monitored` 釘住 PR #456、#400 審過的 head 與狀態；漂移就轉紅，回 ADR-007 重看。
+- 審完在 `DECISIONS.md` 記結論，再推進 `tools/upstream_baseline.json`。
 - 不改檢查器程式；要改行為改艦隊正本（`repo-fleet-ops` 的 `tools/canonical/check_upstream_updates.py`）。
 - 檢查器只 fetch 上游、只讀 `gh`，從不 push，也不對上游開 PR 或 issue。

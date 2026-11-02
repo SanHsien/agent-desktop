@@ -12,6 +12,7 @@ import json
 import re
 import sys
 import tempfile
+import tomllib
 import unittest
 from pathlib import Path
 
@@ -31,6 +32,18 @@ class UpstreamCheckWiring(unittest.TestCase):
         self.assertRegex(baseline["reviewed_through"], r"^[0-9a-f]{40}$")
         self.assertIsInstance(baseline["reviewed_pr_through"], int)
         self.assertIsInstance(baseline["reviewed_issue_through"], int)
+
+    def test_watermarks_record_a_finished_review_not_the_untriaged_zero(self):
+        # A zero watermark turned every upstream PR and issue into a finding (462 at onboarding),
+        # so the weekly check stayed red until someone raised it without reviewing.
+        baseline = upstream.load_baseline()
+        self.assertGreater(baseline["reviewed_pr_through"], 0)
+        self.assertGreater(baseline["reviewed_issue_through"], 0)
+
+    def test_monitored_items_pin_a_full_head_and_a_state(self):
+        for entry in upstream.load_baseline().get("monitored", []):
+            self.assertRegex(entry["head"], r"^[0-9a-f]{40}$", entry["item"])
+            self.assertIn(entry["state"], {"open", "closed", "merged"}, entry["item"])
 
     def test_baseline_decision_log_names_a_file_that_exists(self):
         log = upstream.load_baseline().get("decision_log", upstream.DEFAULT_DECISION_LOG)
@@ -86,6 +99,11 @@ class FreshnessLoaders(unittest.TestCase):
         self.assertIn("uiautomation", names, "target-gated Windows dependency")
         self.assertIn("zbus", names, "exact-pinned Linux dependency")
         self.assertNotIn("agent-desktop-core", names, "a path dependency has no registry release")
+
+    def test_every_workspace_member_is_read(self):
+        workspace = tomllib.loads((REPO_ROOT / "Cargo.toml").read_text(encoding="utf-8"))["workspace"]
+        for member in workspace["members"]:
+            self.assertIn(f"{member}/Cargo.toml", fresh.CARGO_MANIFESTS)
 
     def test_cargo_member_crates_are_not_silently_dropped(self):
         sources = {p["source"] for p in fresh.load_cargo()}

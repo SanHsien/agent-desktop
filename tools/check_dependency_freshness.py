@@ -54,8 +54,8 @@ USER_AGENT = "agent-desktop-dependency-freshness"
 # `.github/dependabot.yml`, and with the manifests named below.
 #
 # Only Cargo is read. `npm/package.json` (the launcher) declares no dependency at all, and
-# `apps/docs` is the upstream documentation site: Dependabot does not scan it either, and this
-# fork neither builds nor deploys it. The loaders for the other ecosystems stay so a manifest
+# `apps/docs` is the upstream documentation site: this fork does not deploy it.
+# Dependabot version updates do not cover it but security updates do (open alerts: ADR-006). The loaders for the other ecosystems stay so a manifest
 # that gains dependencies is one line away from being read; see docs/fork/DECISIONS.md ADR-006.
 ECOSYSTEMS: tuple[str, ...] = ("cargo",)
 NPM_MANIFESTS: tuple[str, ...] = ("npm/package.json",)
