@@ -39,7 +39,7 @@ Write-Host "[PASS] Git remotes configured correctly." -ForegroundColor Green
 
 # 2. 執行 Fork 衛生單元測試
 Write-Host "==> Running Fork hygiene test suite..." -ForegroundColor Yellow
-python -m unittest tests/fork/test_fork_hygiene.py
+python -m unittest discover -s tests/fork
 if ($LASTEXITCODE -ne 0) {
     throw "Fork hygiene unit tests failed with exit code $LASTEXITCODE"
 }

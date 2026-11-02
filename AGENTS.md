@@ -6,6 +6,8 @@
 > - 開發與執行環境為 **Windows 11 原生（PowerShell）**，禁止假設 POSIX shell 語法。PowerShell 中傳遞 Ref 必須以單引號包裹（如 `'@s8f3k2p9:e12'`）。
 > - 本地門禁與衛生驗證入口：`pwsh -NoProfile -File tools/dev_check.ps1`。
 > - 完整 Fork 治理與決策詳見 [`FORK.md`](FORK.md)、[`docs/agent-desktop-computer-use-spec.md`](docs/agent-desktop-computer-use-spec.md) 與 [`docs/fork/`](docs/fork/)。
+> - 本 fork 之後要做什麼只寫在 [`ROADMAP.md`](ROADMAP.md)（單一真相源）：做完一項，在同一個 commit 刪掉那一列；新工作只加在那裡。
+> - 上游檢查器 `tools/check_upstream_updates.py` 是艦隊標準版，**不在這裡改程式**；各 fork 的差異只放 `tools/upstream_baseline.json`。水位只在審完並把結論寫進 `docs/fork/DECISIONS.md` 之後才提高。
 
 Guidance for AI coding agents working in this repository.
 
@@ -291,3 +293,7 @@ must be intended and explained, never found by users.
   with a reason. "Recorded" is not a disposition.
 - Reports and their evidence stay out of version control.
 - Every requirement in a plan maps to at least one test that fails when the requirement is violated.
+
+## Roadmap
+
+- `ROADMAP.md` is the single source of truth for this repository's next work. When you finish or add work, update it in the same commit: delete finished rows, add new ones. Do not keep a to-do list in any other file.

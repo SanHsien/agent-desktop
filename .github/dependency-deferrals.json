@@ -1,0 +1,9 @@
+{
+  "_comment": "Reviewed-but-not-now decisions for tools/check_dependency_freshness.py. Each entry needs deferredLatest and reason; it expires by itself once the registry passes that release. A permanent policy belongs on the declaring line as `# freshness-hold:` instead.",
+  "deferrals": {
+    "zbus": {
+      "deferredLatest": "6.2.1",
+      "reason": "crates/linux pins zbus =5.19.0. deny.toml records why: 5.19 is the newest release with the blocking API the Linux adapter uses, and the three RUSTSEC-2026-0370..0372 ignores go away when the adapter moves to zbus 6. Taken from deny.toml; not re-verified against the zbus 6 changelog. Recorded 2026-11-02 at 6.2.1."
+    }
+  }
+}

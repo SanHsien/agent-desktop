@@ -36,6 +36,10 @@
 | `.github/workflows/fork-maintenance.yml` | 本 fork 專屬之 CI 流程（文件格式、連結、衛生門禁） |
 | `.github/workflows/release.yml` | 加上 `if: github.repository == 'vercel-labs/agent-desktop'` 防護，防止在 fork 上意外觸發上游發布作業 |
 | `.cursor/rules/no-upstream-pr.mdc` | 本地編輯器防呆：防止誤對上游倉庫開 PR 或推送 |
+| `ROADMAP.md` | 本 fork 之後要做什麼的單一真相源 |
+| `tools/check_upstream_updates.py`、`tools/upstream_baseline.json`、`.github/workflows/upstream-check.yml` | 每週列出上游水位之後的新 commit、PR、issue；檢查器為艦隊標準版，差異只放 baseline |
+| `tools/check_dependency_freshness.py`、`.github/dependency-deferrals.json`、`.github/workflows/dependency-freshness.yml` | 每月比對 Cargo 與 Actions 宣告的下限和現行版 |
+| `tests/fork/test_fork_tools.py` | 上述兩支檢查器與其接線的性質測試 |
 
 上游持有的程式碼（`crates/`、`src/`、`apps/`、`npm/`）原樣保留，上游主要文檔以英文為準。
 

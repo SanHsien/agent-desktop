@@ -58,3 +58,20 @@ pwsh -NoProfile -File tools/dev_check.ps1
 # 5. 推送至個人 Fork（絕不推至 upstream）
 git push origin main
 ```
+
+---
+
+## 4. 上游檢查器與水位
+
+每週一的 `Upstream check` workflow 與本機的 `python tools/check_upstream_updates.py --strict` 讀同一份 `tools/upstream_baseline.json`，列出水位之後上游的 commit、PR（含已關閉）與 issue。
+
+| exit code | 意義 |
+| :--- | :--- |
+| 0 | 完整檢查、沒有待審 |
+| 1 | `--strict` 且有待審 |
+| 2 | 檢查沒做完（`git`／`gh` 失敗、清單到上限還沒碰到水位、上游改寫歷史）；**不是**「沒有新東西」 |
+
+- `reviewed_through`：已審到的上游 commit。2026-11-02 起點是 `9eb9b296`（本 fork 的分叉點，即上游 `main` 的 tip），`git rev-list --left-right --count HEAD...upstream/main` 為 `7 0`。
+- `reviewed_pr_through`、`reviewed_issue_through`：起點刻意是 0，因為沒有人審過；提高水位前先把結論寫進 `docs/fork/DECISIONS.md`，並依 `ROADMAP.md` 的分批順序走。
+- 不改檢查器程式；要改行為改艦隊正本（`repo-fleet-ops` 的 `tools/canonical/check_upstream_updates.py`）。
+- 檢查器只 fetch 上游、只讀 `gh`，從不 push，也不對上游開 PR 或 issue。
