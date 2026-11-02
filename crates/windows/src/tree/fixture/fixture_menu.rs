@@ -281,7 +281,7 @@ pub(crate) struct MenuFixture {
 
 impl MenuFixture {
     pub(crate) fn spawn() -> Result<Self, String> {
-        super::bootstrap();
+        super::bootstrap();
         let executable = std::env::current_exe().map_err(|error| error.to_string())?;
         let mut command = Command::new(executable);
         command

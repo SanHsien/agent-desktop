@@ -207,7 +207,10 @@ mod tests {
             assert!(!c_result.post_state.is_null());
             assert!(c_result.steps.is_null());
             assert_eq!(c_result.step_count, 0);
-            let state = c_result.post_state.as_ref().expect("post_state must not be null");
+            let state = c_result
+                .post_state
+                .as_ref()
+                .expect("post_state must not be null");
             assert_eq!(c_to_string(state.role).as_deref(), Some("button"));
             assert_eq!(c_to_string(state.value).as_deref(), Some("OK"));
             assert_eq!(state.state_count, 2);

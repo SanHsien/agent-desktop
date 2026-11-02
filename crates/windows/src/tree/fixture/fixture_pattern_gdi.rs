@@ -175,7 +175,9 @@ impl DibCapture {
         };
         if res == 0 {
             let err = unsafe { windows_sys::Win32::Foundation::GetLastError() };
-            return Err(format!("BitBlt failed against the pattern window, err={err}"));
+            return Err(format!(
+                "BitBlt failed against the pattern window, err={err}"
+            ));
         }
         Ok(capture)
     }

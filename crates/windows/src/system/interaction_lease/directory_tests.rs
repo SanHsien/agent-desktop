@@ -149,7 +149,9 @@ fn a_directory_owned_by_token_user_is_accepted() {
 #[test]
 fn a_directory_owned_by_an_unrelated_sid_is_refused() {
     if !enable_privilege(SE_RESTORE_NAME) {
-        eprintln!("skipping a_directory_owned_by_an_unrelated_sid_is_refused: SeRestorePrivilege not available");
+        eprintln!(
+            "skipping a_directory_owned_by_an_unrelated_sid_is_refused: SeRestorePrivilege not available"
+        );
         return;
     }
     let root = scratch_root("owner-unrelated");

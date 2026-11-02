@@ -98,7 +98,7 @@ unsafe extern "system" fn modal_owner_proc(
 }
 
 fn host_modal_windows() {
-    crate::system::runtime::attach_input_desktop();
+    crate::system::runtime::attach_input_desktop();
     let class_name = fixture_window::unique_class_name();
     if fixture_window::register_class_with_proc(&class_name, modal_owner_proc).is_err() {
         return;

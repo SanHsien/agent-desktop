@@ -319,9 +319,8 @@ fn delayed_owner_thread(
 }
 
 fn advertise_delayed_format(window: HWND) -> Result<(), String> {
-    open_clipboard_when_free(window).map_err(|error| {
-        format!("OpenClipboard failed for delayed owner: {error}")
-    })?;
+    open_clipboard_when_free(window)
+        .map_err(|error| format!("OpenClipboard failed for delayed owner: {error}"))?;
     if unsafe { EmptyClipboard() } == 0 {
         unsafe {
             let _ = CloseClipboard();
