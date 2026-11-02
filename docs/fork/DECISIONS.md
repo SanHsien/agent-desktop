@@ -116,4 +116,4 @@
 - **狀態**：Accepted
 - **脈絡**：fork 的 `v1.0.2` tag 指向 `5d82883d`，上游的 `v1.0.2` 是 `a47ed664`，同名不同物，讀版本號的人會以為兩者相同。沒有文件或工具引用舊的下載網址（查過本 repo、`ai-inbox`、`agent-assets`）。
 - **決策**：release 與 tag 改名 `fork-v1.0.2`，刪除 fork 上的 `v1.0.2` tag；commit、資產與內容不變。不把 `v1.0.2` 強推回上游的 commit：要比對上游 tag 用 `git ls-remote upstream`。之後 fork 的 release 一律用 `fork-` 前綴。維護者授權決定。
-- **代價**：`releases/tag/v1.0.2` 的舊連結失效。
+- **代價**：`releases/tag/v1.0.2` 與 `releases/download/v1.0.2/*` 的舊連結失效。
