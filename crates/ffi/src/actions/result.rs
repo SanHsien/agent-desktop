@@ -71,10 +71,9 @@ pub(crate) fn action_result_to_c(r: &CoreActionResult) -> AdActionResult {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn ad_free_action_result(result: *mut AdActionResult) {
     crate::ffi_try::trap_panic_void(|| unsafe {
-        if result.is_null() {
+        let Some(r) = result.as_mut() else {
             return;
-        }
-        let r = &mut *result;
+        };
         free_c_string(r.action as *mut _);
         free_c_string(r.ref_id as *mut _);
         free_c_string(r.details_json as *mut _);
@@ -86,14 +85,15 @@ pub unsafe extern "C" fn ad_free_action_result(result: *mut AdActionResult) {
             r.post_state,
         ) == Some(1)
         {
-            let state = &mut *r.post_state;
-            free_c_string(state.role as *mut _);
-            free_c_string(state.value as *mut _);
-            if !state.states.is_null() {
-                free_state_array(state.states);
+            if let Some(state) = r.post_state.as_mut() {
+                free_c_string(state.role as *mut _);
+                free_c_string(state.value as *mut _);
+                if !state.states.is_null() {
+                    free_state_array(state.states);
+                }
+                drop(Box::from_raw(r.post_state));
+                r.post_state = ptr::null_mut();
             }
-            drop(Box::from_raw(r.post_state));
-            r.post_state = ptr::null_mut();
         }
         r.action = ptr::null();
         r.ref_id = ptr::null();
@@ -207,7 +207,7 @@ mod tests {
             assert!(!c_result.post_state.is_null());
             assert!(c_result.steps.is_null());
             assert_eq!(c_result.step_count, 0);
-            let state = &*c_result.post_state;
+            let state = c_result.post_state.as_ref().expect("post_state must not be null");
             assert_eq!(c_to_string(state.role).as_deref(), Some("button"));
             assert_eq!(c_to_string(state.value).as_deref(), Some("OK"));
             assert_eq!(state.state_count, 2);
@@ -354,9 +354,15 @@ mod tests {
         let core_result = CoreActionResult::delivered_unverified("click")
             .with_steps(vec![agent_desktop_core::ActionStep::succeeded("AXPress")]);
         let mut result = action_result_to_c(&core_result);
-        let original = unsafe { (*result.steps).label as *mut std::os::raw::c_char };
+        let steps = unsafe {
+            result
+                .steps
+                .as_mut()
+                .expect("steps must not be null when initialized with non-empty steps")
+        };
+        let original = steps.label as *mut std::os::raw::c_char;
         let foreign = std::ffi::CString::new("foreign").unwrap().into_raw();
-        unsafe { (*result.steps).label = foreign };
+        steps.label = foreign;
 
         unsafe { ad_free_action_result(&mut result) };
         assert_eq!(

@@ -218,6 +218,7 @@ pub(crate) fn host_window_at(
     left: i32,
     top: i32,
 ) {
+    crate::system::runtime::attach_input_desktop();
     activate_common_controls_v6();
     if let Err(error) = register_class(class_name) {
         let _ = ready.send(Err(error));

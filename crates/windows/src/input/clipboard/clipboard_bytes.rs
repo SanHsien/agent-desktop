@@ -34,8 +34,10 @@ pub(crate) fn read_i32(bytes: &[u8], offset: usize, field: &str) -> Result<i32, 
 
 pub(crate) fn read_utf16_units(bytes: &[u8]) -> Vec<u16> {
     bytes
-        .chunks_exact(2)
-        .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+        .as_chunks::<2>()
+        .0
+        .iter()
+        .map(|pair| u16::from_le_bytes(*pair))
         .collect()
 }
 

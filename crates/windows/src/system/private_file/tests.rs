@@ -30,6 +30,21 @@ impl Scratch {
 
     pub(super) fn adopt(root: PathBuf) -> Self {
         std::fs::create_dir_all(&root).expect("scratch root must be creatable");
+        let username = std::env::var("USERNAME").unwrap_or_default();
+        let user_grant = format!("{username}:(OI)(CI)F");
+        let _ = std::process::Command::new("icacls")
+            .arg(&root)
+            .args([
+                "/inheritance:r",
+                "/grant:r",
+                "*S-1-5-18:(OI)(CI)F",
+                "*S-1-5-32-544:(OI)(CI)F",
+                "*S-1-3-4:(OI)(CI)F",
+                &user_grant,
+            ])
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status();
         Self { root }
     }
 

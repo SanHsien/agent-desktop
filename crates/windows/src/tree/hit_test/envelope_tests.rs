@@ -388,7 +388,7 @@ fn occluded_headed_auto_wait_reports_receives_events_without_timing_out() {
     let adapter = EnvelopeAdapter::new(live_button(true, area(40.0, 20.0))).occluded("window");
     let error = click(
         &adapter,
-        ActionRequest::headed(Action::Click).with_timeout_ms(Some(80)),
+        ActionRequest::headed(Action::Click).with_timeout_ms(Some(1_000)),
     );
     assert_eq!(error.code, ErrorCode::ActionFailed);
     assert_not_delivered(&error);

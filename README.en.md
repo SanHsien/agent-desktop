@@ -1,14 +1,15 @@
-<p align= center>
-  <a href=\README.md\>繁體中文</a> · <b>English</b>
+<p align="center">
+  <a href="README.md">繁體中文</a> · <b>English</b>
 </p>
+
 # agent-desktop
 
-> **Fork 維護指引（SanHsien/agent-desktop）**：
-> - 上游來源：[`vercel-labs/agent-desktop`](https://github.com/vercel-labs/agent-desktop)（沿用 Apache-2.0 授權與完整 Git 歷史）。
-> - 本 Fork 專屬維護說明：[`FORK.md`](FORK.md) ｜ 著作權與聲明：[`NOTICE.md`](NOTICE.md)。
-> - 整合架構規格手冊：[`docs/agent-desktop-computer-use-spec.md`](docs/agent-desktop-computer-use-spec.md)（涵蓋 Windows UIA、macOS AX、Linux AT-SPI2 映射、PowerShell 單引號防雷規範、以及 STALE_REF 重試安全處置合約）。
-> - 全系統 Agent Skill：已發布至 [`SanHsien/agent-assets`](https://github.com/SanHsien/agent-assets) 與全域技能目錄，支援 Antigravity、Claude Code、Codex、Hermes 跨平台調用。
-> - 本地門禁與品質檢驗：`pwsh -NoProfile -File tools/dev_check.ps1`。
+> **Fork Notice**: This repository is a fork of [`vercel-labs/agent-desktop`](https://github.com/vercel-labs/agent-desktop), maintained by [`SanHsien/agent-desktop`](https://github.com/SanHsien/agent-desktop).
+> - **Upstream Source**: [`vercel-labs/agent-desktop`](https://github.com/vercel-labs/agent-desktop) under Apache-2.0 license.
+> - **Fork Maintenance**: Detailed governance and synchronization guidelines are in [`FORK.md`](FORK.md) and [`NOTICE.md`](NOTICE.md).
+> - **Architecture & Spec**: See [`docs/agent-desktop-computer-use-spec.md`](docs/agent-desktop-computer-use-spec.md) for OS-level accessibility tree mapping (Windows UIA, macOS AX, Linux AT-SPI2), PowerShell quoting rules, and `STALE_REF` retry contracts.
+> - **Cross-Agent Ecosystem**: Registered in [`SanHsien/agent-assets`](https://github.com/SanHsien/agent-assets) and the global agent skill library, enabling seamless Computer Use across Antigravity, Claude Code, Codex, and Hermes.
+> - **Local Verification**: Run `pwsh -NoProfile -File tools/dev_check.ps1` for local quality gates.
 
 Computer use for AI agents: read and operate desktop apps through the OS accessibility tree.
 

@@ -44,6 +44,21 @@ impl IsolatedHome {
             std::process::id()
         ));
         std::fs::create_dir_all(&path).expect("create isolated FFI test HOME");
+        #[cfg(windows)]
+        {
+            let _ = std::process::Command::new("icacls")
+                .arg(&path)
+                .args([
+                    "/inheritance:r",
+                    "/grant:r",
+                    "*S-1-5-18:(OI)(CI)F",
+                    "*S-1-5-32-544:(OI)(CI)F",
+                    "*S-1-3-4:(OI)(CI)F",
+                ])
+                .stdout(std::process::Stdio::null())
+                .stderr(std::process::Stdio::null())
+                .status();
+        }
         let previous = std::env::var_os("HOME");
         let previous_state_root = std::env::var_os("AGENT_DESKTOP_HOME");
         unsafe { std::env::set_var("HOME", &path) };

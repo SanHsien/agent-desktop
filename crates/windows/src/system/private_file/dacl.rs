@@ -10,6 +10,9 @@ use windows_sys::Win32::Security::{
     GetAclInformation, InitializeAcl, OBJECT_INHERIT_ACE, PROTECTED_DACL_SECURITY_INFORMATION,
     WinBuiltinAdministratorsSid, WinLocalSystemSid,
 };
+
+const WIN_CREATOR_OWNER_SID: i32 = 3;
+const WIN_OWNER_RIGHTS_SID: i32 = 71;
 use windows_sys::Win32::Storage::FileSystem::FILE_ALL_ACCESS;
 
 use super::owner;
@@ -98,7 +101,7 @@ pub(super) fn require_private(handle: &File) -> std::io::Result<()> {
             "private file has no DACL",
         ))
     } else {
-        principals().and_then(|accepted| grants_only(dacl, &accepted))
+        accepted_principals().and_then(|accepted| grants_only(dacl, &accepted))
     };
     if !descriptor.is_null() {
         unsafe { LocalFree(descriptor) };
@@ -113,6 +116,17 @@ fn principals() -> std::io::Result<Vec<SidBuffer>> {
         token_sid::token_user_sid(TokenSource::CurrentProcess)?,
     ];
     principals.extend(owner::process_owner_eligible_sids()?.entries());
+    Ok(principals)
+}
+
+fn accepted_principals() -> std::io::Result<Vec<SidBuffer>> {
+    let mut principals = principals()?;
+    if let Ok(owner_rights) = SidBuffer::well_known(WIN_OWNER_RIGHTS_SID) {
+        principals.push(owner_rights);
+    }
+    if let Ok(creator_owner) = SidBuffer::well_known(WIN_CREATOR_OWNER_SID) {
+        principals.push(creator_owner);
+    }
     Ok(principals)
 }
 

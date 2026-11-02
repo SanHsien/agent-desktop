@@ -99,6 +99,7 @@ impl Drop for Win32ClickFixture {
 }
 
 fn run_pump(class_name: &str, ready: Sender<Result<FixtureReady, String>>) {
+    agent_desktop_windows::attach_input_desktop();
     activate_common_controls_v6();
     let name = wide(class_name);
     let class = WNDCLASSEXW {

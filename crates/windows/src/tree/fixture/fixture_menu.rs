@@ -229,6 +229,8 @@ unsafe extern "system" fn menu_window_proc(
 }
 
 fn host_menu_window() {
+    crate::system::runtime::attach_input_desktop();
+
     let class_name = fixture_window::unique_class_name();
     if fixture_window::register_class_with_proc(&class_name, menu_window_proc).is_err() {
         return;
@@ -279,6 +281,7 @@ pub(crate) struct MenuFixture {
 
 impl MenuFixture {
     pub(crate) fn spawn() -> Result<Self, String> {
+        super::bootstrap();
         let executable = std::env::current_exe().map_err(|error| error.to_string())?;
         let mut command = Command::new(executable);
         command
@@ -293,6 +296,8 @@ impl MenuFixture {
             move |stdout, sender| {
                 let mut announced = false;
                 for line in BufReader::new(stdout).lines().map_while(Result::ok) {
+                    eprintln!("[MENU CHILD LINE]: {line}");
+
                     let line = line.trim();
                     if !announced {
                         if let Some(value) = line.strip_prefix(MENU_HANDLE_PREFIX) {

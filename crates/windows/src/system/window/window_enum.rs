@@ -78,6 +78,7 @@ pub(crate) fn enumerate_top_level(
         i32::from(keep_going)
     }
 
+    crate::system::runtime::attach_input_desktop();
     let stopped_early = std::rc::Rc::new(std::cell::Cell::new(false));
     let stop_flag = std::rc::Rc::clone(&stopped_early);
     let mut boxed: Box<dyn FnMut(EnumeratedWindow) -> bool> = Box::new(move |window| {
@@ -87,9 +88,11 @@ pub(crate) fn enumerate_top_level(
         }
         keep_going
     });
+    unsafe { windows_sys::Win32::Foundation::SetLastError(0) };
     let parameter = (&mut boxed as *mut Box<dyn FnMut(EnumeratedWindow) -> bool>) as isize;
     let succeeded = unsafe { EnumWindows(Some(callback), parameter) };
-    if succeeded == 0 && !stopped_early.get() {
+    let err = unsafe { windows_sys::Win32::Foundation::GetLastError() };
+    if succeeded == 0 && !stopped_early.get() && err != 0 {
         return Err(AdapterError::internal(
             "EnumWindows failed to enumerate top-level windows",
         ));
@@ -166,12 +169,7 @@ mod tests {
 
         enumerate_top_level(|window| {
             visited.push(window.handle);
-            if first {
-                first = false;
-                false
-            } else {
-                true
-            }
+            !std::mem::take(&mut first)
         })
         .expect("enumeration succeeds");
 

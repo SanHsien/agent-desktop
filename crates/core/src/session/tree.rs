@@ -24,6 +24,7 @@ pub(super) fn create(dir: &Path) -> Result<(), AppError> {
     }
     #[cfg(not(unix))]
     {
+        crate::storage::private_file_parent::ensure_private(dir)?;
         crate::storage::private_file_parent::ensure_private(&dir.join("trace"))?;
     }
     Ok(())

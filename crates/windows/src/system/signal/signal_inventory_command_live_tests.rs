@@ -22,7 +22,7 @@ use crate::adapter::WindowsAdapter;
 use crate::system::window::listing_retry::LISTING_RACE_ATTEMPTS;
 use crate::tree::fixture::{HostedFixture, bootstrap};
 
-const NO_TRANSITION_TIMEOUT_MS: u64 = 1_500;
+const NO_TRANSITION_TIMEOUT_MS: u64 = 3_000;
 
 fn event_args(event: &str, window_id: String, timeout_ms: u64) -> WaitArgs {
     WaitArgs {

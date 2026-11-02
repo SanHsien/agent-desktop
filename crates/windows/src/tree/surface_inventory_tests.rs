@@ -264,13 +264,6 @@ fn a_process_with_no_windows_returns_an_empty_inventory() {
 /// nothing the census filter would admit, and whose generation token is
 /// readable so the inventory's identity check can be satisfied.
 fn windowless_process_pid() -> Option<u32> {
-    const WINDOWLESS_NAMES: [&str; 5] = [
-        "svchost.exe",
-        "conhost.exe",
-        "fontdrvhost.exe",
-        "spoolsv.exe",
-        "services.exe",
-    ];
     let mut window_owners = std::collections::HashSet::new();
     enumerate_top_level(|window| {
         if let Some(owner) = live_window_owner(window.handle) {
@@ -285,13 +278,8 @@ fn windowless_process_pid() -> Option<u32> {
         .ok()?
         .into_iter()
         .find(|row| {
-            WINDOWLESS_NAMES.contains(&row.name.to_ascii_lowercase().as_str())
-                && !window_owners.contains(&u32::from(row.pid))
+            !window_owners.contains(&u32::from(row.pid))
+                && token_for_pid(row.pid).ok().flatten().is_some()
         })
-        .and_then(|row| {
-            token_for_pid(row.pid)
-                .ok()
-                .flatten()
-                .map(|_| u32::from(row.pid))
-        })
+        .map(|row| u32::from(row.pid))
 }

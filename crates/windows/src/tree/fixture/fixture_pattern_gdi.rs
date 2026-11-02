@@ -105,6 +105,7 @@ pub(super) fn host_pattern_window(
     left: i32,
     top: i32,
 ) {
+    crate::system::runtime::attach_input_desktop();
     if let Err(error) = fixture_window::register_class_with_proc(class_name, pattern_window_proc) {
         let _ = ready.send(Err(error));
         return;
@@ -154,10 +155,12 @@ struct DibCapture {
 
 impl DibCapture {
     fn from_window_blit(handle: isize) -> Result<Self, String> {
+        crate::system::runtime::attach_input_desktop();
         let window = handle as HWND;
         let (width, height) = client_size(window);
         let capture = Self::allocate(window, width, height)?;
-        if unsafe {
+        unsafe { windows_sys::Win32::Foundation::SetLastError(0) };
+        let res = unsafe {
             BitBlt(
                 capture.memory_dc,
                 0,
@@ -169,9 +172,10 @@ impl DibCapture {
                 0,
                 SRCCOPY,
             )
-        } == 0
-        {
-            return Err(String::from("BitBlt failed against the pattern window"));
+        };
+        if res == 0 {
+            let err = unsafe { windows_sys::Win32::Foundation::GetLastError() };
+            return Err(format!("BitBlt failed against the pattern window, err={err}"));
         }
         Ok(capture)
     }

@@ -32,10 +32,12 @@ const STALL_POLL: Duration = Duration::from_millis(25);
 /// Automation. Four modules previously each defined their own one-line
 /// `bootstrap()` around this call.
 pub(crate) fn bootstrap() {
+    crate::system::runtime::attach_input_desktop();
     ensure_test_apartment();
 }
 
 pub(crate) fn ensure_test_apartment() {
+    crate::system::runtime::attach_input_desktop();
     crate::system::runtime::com_runtime::ensure_hosted_library_mta_and_dpi()
         .expect("the process-wide MTA registration succeeds");
 }
@@ -290,6 +292,7 @@ impl Drop for StalledFixture {
 }
 
 fn stalled_window(class_name: &str, ready: Sender<Result<isize, String>>, stop: Arc<AtomicBool>) {
+    crate::system::runtime::attach_input_desktop();
     use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
     use windows_sys::Win32::UI::WindowsAndMessaging::{
         CreateWindowExW, DestroyWindow, SW_SHOWNOACTIVATE, ShowWindow, WS_OVERLAPPEDWINDOW,

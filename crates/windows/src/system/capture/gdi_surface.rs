@@ -89,6 +89,7 @@ impl GdiDcPair {
     pub(in crate::system) fn create(context: &str) -> Result<Self, AdapterError> {
         use windows_sys::Win32::Graphics::Gdi::{CreateCompatibleDC, GetDC, ReleaseDC};
 
+        crate::system::runtime::attach_input_desktop();
         let screen_dc = unsafe { GetDC(std::ptr::null_mut()) };
         if screen_dc.is_null() {
             return Err(win32_last_error(&format!("GetDC failed for {context}")));

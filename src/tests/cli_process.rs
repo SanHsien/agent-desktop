@@ -242,7 +242,24 @@ fn create_private_dir(dir: &std::path::Path) {
         .expect("create state root");
 }
 
-#[cfg(not(unix))]
+#[cfg(windows)]
+fn create_private_dir(dir: &std::path::Path) {
+    std::fs::create_dir_all(dir).expect("create state root");
+    let _ = std::process::Command::new("icacls")
+        .arg(dir)
+        .args([
+            "/inheritance:r",
+            "/grant:r",
+            "*S-1-5-18:(OI)(CI)F",
+            "*S-1-5-32-544:(OI)(CI)F",
+            "*S-1-3-4:(OI)(CI)F",
+        ])
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status();
+}
+
+#[cfg(all(not(unix), not(windows)))]
 fn create_private_dir(dir: &std::path::Path) {
     std::fs::create_dir_all(dir).expect("create state root");
 }

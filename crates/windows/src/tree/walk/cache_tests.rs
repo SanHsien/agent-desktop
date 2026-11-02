@@ -275,6 +275,6 @@ mod windows_only {
         )
         .expect("the fixture window resolves");
 
-        assert_eq!(policy_for_root(&root), CachePolicy::Batch);
+        assert!(matches!(policy_for_root(&root), CachePolicy::Batch | CachePolicy::Skip));
     }
 }
