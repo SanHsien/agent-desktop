@@ -43,7 +43,7 @@
 
 上游持有的程式碼（`crates/`、`src/`、`apps/`、`npm/`）**不是**原樣保留：本 fork 在 `crates/`、`src/` 帶著 Windows 修正（`8d372752`、`0f7e8e65`、`a67bf683`），與上游 `main` 差 32 個產品檔（2026-11-02 `git diff --name-only upstream/main HEAD -- crates src apps npm`）。逐檔清單與移除條件尚未整理。
 
-本 fork 的 `v1.0.2` tag 指向 fork 自己的 `5d82883d`，與上游的 `v1.0.2`（`a47ed664`）同名不同物：`5d82883d` 的產品檔與上游 `main` `9eb9b296`（上游 release 之後）相同，與上游 `v1.0.2` 差 93 個產品檔（`git rev-parse v1.0.2`、`git ls-remote upstream 'refs/tags/v1.0.2*'`）。見 [`docs/fork/DECISIONS.md`](docs/fork/DECISIONS.md) ADR-007。上游主要文檔以英文為準。
+本 fork 自己的 release 名為 `fork-v1.0.2`（`5d82883d`，只有 Windows x64），2026-11-02 由 `v1.0.2` 改名，避免與上游的 `v1.0.2`（`a47ed664`）同名不同物。之後 fork 的 release 一律用 `fork-` 前綴，見 [`docs/fork/DECISIONS.md`](docs/fork/DECISIONS.md) ADR-008。上游主要文檔以英文為準。
 
 ---
 

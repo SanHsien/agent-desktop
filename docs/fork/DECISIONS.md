@@ -106,4 +106,14 @@
 
 - **水位軌道**：`track: release` 加 `ticket_cutoff: release`。理由見 [`UPSTREAM.md`](UPSTREAM.md) 第 4 節。
 - **依賴新鮮度**：另立 [ADR-006](#adr-006-依賴新鮮度只讀-cargo-與-actions-的宣告)。同一天的實查結論：Cargo 與 Actions 共 9 筆落後的新版本屬上游持有的宣告，寫成 `.github/dependency-deferrals.json`。**`apps/docs`** 不讀，理由只有一條：上游的文件站，本 fork 不部署（`gh api repos/SanHsien/agent-desktop/deployments` 為 0、Pages API 回 404）。Dependabot 版本更新沒涵蓋它（`.github/dependabot.yml` 只有 cargo、npm `/npm`、github-actions），但安全更新是開的：4 筆 open alert、4 個失敗的更新 job，見 ADR-006。
-- **已知問題：`v1.0.2` tag 與上游同名不同物**。本 fork 的 tag 指向 `5d82883d`（fork 自己的 release，只有 Windows x64），上游是 `a47ed664`。`5d82883d` 的 `crates/`、`src/`、`apps/`、`npm/` 與上游 `main` `9eb9b296`（`a47ed664` 之後的內容）相同，與上游的 `v1.0.2` 差 93 個產品檔（`git diff --name-only 5d82883d a47ed664 -- crates src apps npm`）。`git fetch upstream --tags` 可能因此拒絕更新 tag，所以 [`UPSTREAM.md`](UPSTREAM.md) 改用 `--no-tags`。tag 要不要改名是維護者的決定，尚未決定。
+- **已知問題：`v1.0.2` tag 與上游同名不同物**。本 fork 的 tag 指向 `5d82883d`（fork 自己的 release，只有 Windows x64），上游是 `a47ed664`。`5d82883d` 的 `crates/`、`src/`、`apps/`、`npm/` 與上游 `main` `9eb9b296`（`a47ed664` 之後的內容）相同，與上游的 `v1.0.2` 差 93 個產品檔（`git diff --name-only 5d82883d a47ed664 -- crates src apps npm`）。`git fetch upstream --tags` 可能因此拒絕更新 tag，所以 [`UPSTREAM.md`](UPSTREAM.md) 改用 `--no-tags`。2026-11-02 已決定改名，見 ADR-008。
+
+---
+
+## ADR-008: fork 的 release 用 `fork-` 前綴
+
+- **日期**：2026-11-02
+- **狀態**：Accepted
+- **脈絡**：fork 的 `v1.0.2` tag 指向 `5d82883d`，上游的 `v1.0.2` 是 `a47ed664`，同名不同物，讀版本號的人會以為兩者相同。沒有文件或工具引用舊的下載網址（查過本 repo、`ai-inbox`、`agent-assets`）。
+- **決策**：release 與 tag 改名 `fork-v1.0.2`，刪除 fork 上的 `v1.0.2` tag；commit、資產與內容不變。不把 `v1.0.2` 強推回上游的 commit：要比對上游 tag 用 `git ls-remote upstream`。之後 fork 的 release 一律用 `fork-` 前綴。維護者授權決定。
+- **代價**：`releases/tag/v1.0.2` 的舊連結失效。

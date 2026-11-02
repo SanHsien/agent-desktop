@@ -26,7 +26,7 @@ gh repo set-default --view
 ## 2. 上游變更拉取與比對
 
 ```powershell
-# 1. 抓取上游最新 commit（不抓 tag：本 fork 的 v1.0.2 與上游同名不同物，見 DECISIONS ADR-007）
+# 1. 抓取上游最新 commit（不抓 tag：上游 tag 不帶進 fork，比對上游 tag 用 git ls-remote upstream）
 git fetch upstream --no-tags
 
 # 2. 檢視上游相較於本地 main 的新增 commit 清單
