@@ -22,11 +22,15 @@ use crate::system::launch_path::{child_environment_block, resolve_executable};
 fn a_launched_process_never_inherits_the_lease_handoff_key() {
     with_interaction_lease_test_lock(|| {
         unsafe { std::env::set_var(INTERACTION_LEASE_HANDLE_ENV, "424242") };
+        let probe_key = "AGENT_DESKTOP_LEASE_ENCODING_PROBE";
+        let probe_value = "\u{6e2c}\u{8a66}\u{1f680}";
+        unsafe { std::env::set_var(probe_key, probe_value) };
         let overrides = BTreeMap::new();
         let block = child_environment_block(&overrides, INTERACTION_LEASE_HANDLE_ENV)
             .expect("decision")
             .expect("an inherited lease handle key forces an explicit block");
         unsafe { std::env::remove_var(INTERACTION_LEASE_HANDLE_ENV) };
+        unsafe { std::env::remove_var(probe_key) };
 
         let output_path = std::env::temp_dir().join(format!(
             "agent-desktop-lease-env-isolation-{}.txt",
@@ -37,6 +41,8 @@ fn a_launched_process_never_inherits_the_lease_handoff_key() {
         let command_line = super::command_line_for(
             &comspec,
             &[
+                "/D".to_string(),
+                "/U".to_string(),
                 "/C".to_string(),
                 "set".to_string(),
                 ">".to_string(),
@@ -84,12 +90,25 @@ fn a_launched_process_never_inherits_the_lease_handoff_key() {
             "cmd.exe must finish writing its environment dump before it is read"
         );
 
-        let contents = std::fs::read_to_string(&output_path)
+        let bytes = std::fs::read(&output_path)
             .expect("the child process should have written its environment dump");
+        let (pairs, remainder) = bytes.as_chunks::<2>();
+        assert!(
+            remainder.is_empty(),
+            "cmd /U must write complete UTF-16 units"
+        );
+        let units: Vec<u16> = pairs.iter().map(|pair| u16::from_le_bytes(*pair)).collect();
+        let contents = String::from_utf16(&units).expect("cmd /U must write valid UTF-16LE");
         let _ = std::fs::remove_file(&output_path);
         assert!(
             contents.to_ascii_uppercase().contains("SYSTEMROOT="),
             "the dump must carry the inherited environment before its absence check means anything: {contents}"
+        );
+        assert!(
+            contents
+                .lines()
+                .any(|line| line == format!("{probe_key}={probe_value}")),
+            "the child must preserve non-ASCII environment values"
         );
         let folded_prefix = format!("{}=", INTERACTION_LEASE_HANDLE_ENV.to_ascii_uppercase());
         assert!(
