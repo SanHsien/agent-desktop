@@ -68,12 +68,13 @@
 
 - **日期**：2026-11-02
 - **狀態**：Accepted
-- **脈絡**：Dependabot 看的是 lock 的移動，不回答「宣告的下限是否悄悄變舊」。本 fork 的 `npm/package.json` 沒有任何依賴，`apps/docs` 是上游的文件站，本 fork 不部署（`gh api repos/SanHsien/agent-desktop/deployments` 為 0、Pages API 回 404），不讀它的理由只有這一條。Dependabot 版本更新沒涵蓋它（`.github/dependabot.yml` 只有 cargo、npm `/npm`、github-actions），但安全更新是開的：2026-11-02 `apps/docs/pnpm-lock.yaml` 有 4 筆 open alert（minimatch、glob 為 medium，katex、esbuild 為 low），`296ef839` 上 4 個 `npm_and_yarn in /apps/docs` 更新 job 全 failure（log 只有 updater error，細節需要 repo 寫入權限）。處理列在 `ROADMAP.md` 近期。
+- **脈絡**：Dependabot 看的是 lock 的移動，不回答「宣告的下限是否悄悄變舊」。本 fork 的 `npm/package.json` 沒有任何依賴，`apps/docs` 是上游的文件站，本 fork 不部署（`gh api repos/SanHsien/agent-desktop/deployments` 為 0、Pages API 回 404），不讀它的理由只有這一條。Dependabot 版本更新沒涵蓋它（`.github/dependabot.yml` 只有 cargo、npm `/npm`、github-actions），但安全更新是開的：2026-11-02 `apps/docs/pnpm-lock.yaml` 有 4 筆 open alert（minimatch、glob 為 medium，katex、esbuild 為 low），`296ef839` 上 4 個 `npm_and_yarn in /apps/docs` 更新 job 全 failure（log 只有 updater error，細節需要 repo 寫入權限）。處理結果見下方決策第 5 點。
 - **決策**：
   1. `tools/check_dependency_freshness.py` 讀根目錄 workspace 與各成員的 `Cargo.toml`（含 target 限定的依賴）對 crates.io，以及 `.github/workflows/*.yml` 的 action 釘版對 GitHub Releases。
   2. 紅燈只有兩條出口：宣告行的 `# freshness-hold:`（常態政策），或 `.github/dependency-deferrals.json`（已評估、這個月不升，超過 `deferredLatest` 自動失效）。調高下限來消音不算。
   3. 目前的 deferral 共 9 筆，每筆的 `deferredLatest` 是 2026-11-02 讀 crates.io／GitHub Releases 的當日最新版，registry 超過它就自動失效。`zbus`：`crates/linux` 釘 `=5.19.0`，`deny.toml` 記載 5.19 是有 blocking API 的最新版；理由取自 `deny.toml`，未對照 zbus 6 changelog。`futures-util`（`=0.3.33`，最新 0.3.34）、`rustix`（`=1.1.5`，最新 1.1.6）也是 `crates/linux/Cargo.toml` 的精確釘版。`actions/download-artifact`、`setup-node`、`setup-python`、`upload-artifact`、`github/codeql-action/init`、`analyze` 是 `ci.yml`、`codeql.yml`、`release*.yml`、`supply-chain.yml`、`windows-capability-probe.yml` 的釘版。後兩類沒有 `deny.toml` 那樣的專屬理由，擱置的依據只有一條：宣告所在的檔案與上游 `main` 逐字相同（`git diff upstream/main HEAD --stat -- crates/linux .github/workflows` 只列出本 fork 自己的 4 個 workflow，沒有 `crates/linux`；`release.yml` 的差異是 ADR-004 的一行 guard，不在釘版行）。
   4. 上游持有檔案裡落後的釘版（第 3 點列的 8 筆非 `zbus` 項目）不在本 fork 改，也不合併動到這些檔案的 Dependabot PR（合併它與手改一樣會在日後上游同步時衝突）；等上游升級後經 commit 軸同步，等待期間以第 3 點的 deferral 擱置，並由 `ROADMAP.md` 追蹤。fork 的 Dependabot version updates 是否開啟尚未實查，不作為出口。
+  5. `apps/docs` 的 Dependabot 安全告警（2026-11-02 的 #1 esbuild、#2 katex、#3 glob、#4 minimatch）於 2026-11-03 以 `tolerable_risk` 駁回：該站是上游的文件站，本 fork 不建置、不部署（deployments 0、Pages 404），四個安全更新 job 皆為 `security_update_not_possible`（可解析版本上限低於修補起點），手動升級會改到上游持有的 `apps/docs` 而在同步時衝突。重新評估條件：本 fork 開始建置或部署 `apps/docs`，或上游自行升級到修補版本後經 commit 軸同步。
 
 ---
 
@@ -105,7 +106,7 @@
 
 - **產品差異清單**：逐檔理由、移除條件與比對方式見 [DIVERGENCE.md](../DIVERGENCE.md)；`tools/check_divergence.py` 核對 `crates/`、`src/`、`apps/`、`npm/`，漏列或多列會失敗。
 - **水位軌道**：`track: release` 加 `ticket_cutoff: release`。理由見 [`UPSTREAM.md`](UPSTREAM.md) 第 4 節。
-- **依賴新鮮度**：另立 [ADR-006](#adr-006-依賴新鮮度只讀-cargo-與-actions-的宣告)。同一天的實查結論：Cargo 與 Actions 共 9 筆落後的新版本屬上游持有的宣告，寫成 `.github/dependency-deferrals.json`。**`apps/docs`** 不讀，理由只有一條：上游的文件站，本 fork 不部署（`gh api repos/SanHsien/agent-desktop/deployments` 為 0、Pages API 回 404）。Dependabot 版本更新沒涵蓋它（`.github/dependabot.yml` 只有 cargo、npm `/npm`、github-actions），但安全更新是開的：4 筆 open alert、4 個失敗的更新 job，見 ADR-006。
+- **依賴新鮮度**：另立 [ADR-006](#adr-006-依賴新鮮度只讀-cargo-與-actions-的宣告)。同一天的實查結論：Cargo 與 Actions 共 9 筆落後的新版本屬上游持有的宣告，寫成 `.github/dependency-deferrals.json`。**`apps/docs`** 不讀，理由只有一條：上游的文件站，本 fork 不部署（`gh api repos/SanHsien/agent-desktop/deployments` 為 0、Pages API 回 404）。Dependabot 版本更新沒涵蓋它（`.github/dependabot.yml` 只有 cargo、npm `/npm`、github-actions），但安全更新是開的：4 筆 open alert、4 個失敗的更新 job；2026-11-03 已駁回，見 ADR-006 第 5 點。
 - **已知問題：`v1.0.2` tag 與上游同名不同物**。本 fork 的 tag 指向 `5d82883d`（fork 自己的 release，只有 Windows x64），上游是 `a47ed664`。`5d82883d` 的 `crates/`、`src/`、`apps/`、`npm/` 與上游 `main` `9eb9b296`（`a47ed664` 之後的內容）相同，與上游的 `v1.0.2` 差 93 個產品檔（`git diff --name-only 5d82883d a47ed664 -- crates src apps npm`）。`git fetch upstream --tags` 可能因此拒絕更新 tag，所以 [`UPSTREAM.md`](UPSTREAM.md) 改用 `--no-tags`。2026-11-02 已決定改名，見 ADR-008。
 
 ---
