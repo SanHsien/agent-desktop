@@ -45,6 +45,13 @@ if ($LASTEXITCODE -ne 0) {
 }
 Write-Host "[PASS] Fork hygiene unit tests passed." -ForegroundColor Green
 
+Write-Host "==> Checking product divergence ledger..." -ForegroundColor Yellow
+python tools/check_divergence.py
+if ($LASTEXITCODE -ne 0) {
+    throw "Product divergence check failed with exit code $LASTEXITCODE"
+}
+Write-Host "[PASS] Product divergence ledger matches." -ForegroundColor Green
+
 # 3. 檢查本地 Native Binary 與狀態
 Write-Host "==> Verifying local native binary executable..." -ForegroundColor Yellow
 $binaryPath = Join-Path $repoRoot "npm\bin\agent-desktop-win32-x64.exe"

@@ -26,7 +26,6 @@
 - **決策**：
   1. 將 Windows UI Automation 原生無障礙樹作為首選操控途徑。
   2. 在全域規範、Prompt 範本與技能說明中強制要求：所有傳入命令列的 Ref 必須以單引號包裹（`'@s8f3k2p9:e12'`）。
-  3. 實作 `tools/verify_a11y_tree_snapshot.py` 驗證 Ref 解析器與剝離邏輯。
 
 ---
 
@@ -104,6 +103,7 @@
 | 已合併但 base 不是 `main` 的 PR（82 筆；標題含 `windows`／`win32`／`uia` 的 30 筆，#445、#447 在 baseline 舊 notes 被點名） | 55 筆內容已隨 commit 軸進入；25 筆不適用；2 筆（#445、#447）等合併 | 2026-11-02 唯讀 `gh pr list --state all` 依 head 分支追堆疊。**55 筆**（含標題含 windows 的 28 筆）的最底層收口 PR 已合進 `main`，merge commit 是 `upstream/main` 的祖先：`feat/windows-adapter` 的 32 筆經 #110（`483a31d0`），`ctate/*` 經 #342、#345、#347，其餘經 #67、#77、#93、#137；沒有逐筆驗證堆疊內每個 commit 都在該 merge 之前進入分支。**25 筆**在 `feat/linux-adapter` 的堆疊，收口 PR #298 已關閉未合併；其中標題含 windows 的 #290、#305 內容是 Linux 轉接層，本 fork 只發 Windows 版。**2 筆**（#445、#447）在 `laf/identity-linux-windows`，收口 PR #442 開著，且 base 是 `laf/identity-lean`（其上還有開著的 #441，base `laf/remove-macos-host`），不是 `main`；後面的鏈沒有追完 | #442 合併進 `main`、#298 重開或其分支進 `main`、或 `Upstream check` 在新 release 後列出相關項目 |
 | 分支軸 | 不開 | API 列出 177 個上游分支；本輪未逐一比對未開 PR 的分支 | 上游開長期分支 |
 
+- **產品差異清單**：逐檔理由、移除條件與比對方式見 [DIVERGENCE.md](../DIVERGENCE.md)；`tools/check_divergence.py` 核對 `crates/`、`src/`、`apps/`、`npm/`，漏列或多列會失敗。
 - **水位軌道**：`track: release` 加 `ticket_cutoff: release`。理由見 [`UPSTREAM.md`](UPSTREAM.md) 第 4 節。
 - **依賴新鮮度**：另立 [ADR-006](#adr-006-依賴新鮮度只讀-cargo-與-actions-的宣告)。同一天的實查結論：Cargo 與 Actions 共 9 筆落後的新版本屬上游持有的宣告，寫成 `.github/dependency-deferrals.json`。**`apps/docs`** 不讀，理由只有一條：上游的文件站，本 fork 不部署（`gh api repos/SanHsien/agent-desktop/deployments` 為 0、Pages API 回 404）。Dependabot 版本更新沒涵蓋它（`.github/dependabot.yml` 只有 cargo、npm `/npm`、github-actions），但安全更新是開的：4 筆 open alert、4 個失敗的更新 job，見 ADR-006。
 - **已知問題：`v1.0.2` tag 與上游同名不同物**。本 fork 的 tag 指向 `5d82883d`（fork 自己的 release，只有 Windows x64），上游是 `a47ed664`。`5d82883d` 的 `crates/`、`src/`、`apps/`、`npm/` 與上游 `main` `9eb9b296`（`a47ed664` 之後的內容）相同，與上游的 `v1.0.2` 差 93 個產品檔（`git diff --name-only 5d82883d a47ed664 -- crates src apps npm`）。`git fetch upstream --tags` 可能因此拒絕更新 tag，所以 [`UPSTREAM.md`](UPSTREAM.md) 改用 `--no-tags`。2026-11-02 已決定改名，見 ADR-008。

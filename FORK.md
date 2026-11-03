@@ -41,7 +41,7 @@
 | `tools/check_dependency_freshness.py`、`.github/dependency-deferrals.json`、`.github/workflows/dependency-freshness.yml` | 每月比對 Cargo 與 Actions 宣告的下限和現行版 |
 | `tests/fork/test_fork_tools.py` | 上述兩支檢查器與其接線的性質測試 |
 
-上游持有的程式碼（`crates/`、`src/`、`apps/`、`npm/`）**不是**原樣保留：本 fork 在 `crates/`、`src/` 帶著 Windows 修正（`8d372752`、`0f7e8e65`、`a67bf683`），與上游 `main` 差 32 個產品檔（2026-11-02 `git diff --name-only upstream/main HEAD -- crates src apps npm`）。逐檔清單與移除條件尚未整理。
+上游持有的程式碼（`crates/`、`src/`、`apps/`、`npm/`）**不是**原樣保留：本 fork 在 `crates/`、`src/` 帶著 Windows 修正（`8d372752`、`0f7e8e65`、`a67bf683`），與上游 `main` 差 32 個產品檔（2026-11-02 `git diff --name-only "$(git merge-base upstream/main HEAD)" HEAD -- crates src apps npm`）。逐檔理由與移除條件見 [docs/DIVERGENCE.md](docs/DIVERGENCE.md)；`python tools/check_divergence.py` 以 DIVERGENCE.md 釘住的 Base 檢查清單是否與工作樹一致，`--target HEAD` 檢查 commit。
 
 本 fork 自己的 release 名為 `fork-v1.0.2`（`5d82883d`，只有 Windows x64），2026-11-02 由 `v1.0.2` 改名，避免與上游的 `v1.0.2`（`a47ed664`）同名不同物。之後 fork 的 release 一律用 `fork-` 前綴，見 [`docs/fork/DECISIONS.md`](docs/fork/DECISIONS.md) ADR-008。上游主要文檔以英文為準。
 
