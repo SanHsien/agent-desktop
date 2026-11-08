@@ -1,7 +1,8 @@
 use crate::adapter::WindowsAdapter;
 use crate::input::clipboard::set_content;
 use crate::system::capture::capture_test_support::{
-    HomeIsolation, install_windows_private_file, sample_png, with_restored_clipboard,
+    HomeIsolation, install_windows_private_file, sample_png, with_locked_external_desktop_home,
+    with_restored_clipboard,
 };
 use crate::system::fixture::test_time::deadline;
 use crate::system::private_file::WindowsPrivateFile;
@@ -133,4 +134,28 @@ fn screenshot_user_path_bypasses_private_policy_that_refuses_reparse() {
     let _ = std::fs::remove_file(elsewhere.join("shot.png"));
     let _ = std::fs::remove_dir(&junction);
     let _ = std::fs::remove_dir_all(&root);
+}
+
+#[test]
+fn home_isolation_isolates_state_root_when_external_agent_desktop_home_is_set() {
+    let external_home = std::env::temp_dir().join(format!("external-home-{}", std::process::id()));
+    std::fs::create_dir_all(&external_home).expect("external home");
+    with_locked_external_desktop_home(&external_home, || {
+        {
+            let home = HomeIsolation::enter_with_held_lock("agent-desktop-home-isolation-test");
+            let state_root = agent_desktop_core::session::agent_desktop_dir().expect("state root");
+            assert!(
+                state_root.starts_with(home.path()),
+                "state root must land inside HomeIsolation root, got: {}",
+                state_root.display()
+            );
+            assert_ne!(
+                state_root, external_home,
+                "state root must not use external AGENT_DESKTOP_HOME"
+            );
+        }
+        let restored = std::env::var_os("AGENT_DESKTOP_HOME");
+        assert_eq!(restored.as_deref(), Some(external_home.as_os_str()));
+    });
+    let _ = std::fs::remove_dir_all(&external_home);
 }

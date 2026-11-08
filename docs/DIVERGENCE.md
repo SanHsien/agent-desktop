@@ -37,6 +37,7 @@ Git 產品差異清單 + 表格
 | `crates/windows/src/input/clipboard/clipboard_bytes.rs` | UTF-16 解碼改用固定大小 `as_chunks`，對齊 clippy 要求 | 上游解碼保留尾端不完整位元組的行為，且 clippy 與剪貼簿測試通過 |
 | `crates/windows/src/input/clipboard/clipboard_files_tests.rs` | HDROP 測試的 UTF-16 解碼同步改用 `as_chunks` | 上游測試具有相同對齊與 round-trip 覆蓋，clippy 通過 |
 | `crates/windows/src/lib.rs` | 匯出 `attach_input_desktop` 給跨 crate 的 fixture 使用 | 上游有等效公開入口，或跨 crate 的附掛呼叫不再需要 |
+| `crates/windows/src/system/capture/capture_routing_parity_tests.rs` | 新增 HomeIsolation 於外部存在 AGENT_DESKTOP_HOME 時維持目錄隔離之單元測試 | 上游具備等效之 AGENT_DESKTOP_HOME 測試隔離回歸覆蓋，且 capture routing 測試通過 |
 | `crates/windows/src/system/capture/capture_test_support.rs` | capture 測試的隔離目錄明設私有 ACL，避免環境繼承權限影響測試 | 上游隔離目錄能通過 Windows 私有目錄驗證與 capture 測試 |
 | `crates/windows/src/system/capture/capture_window.rs` | 空影格檢查改用固定大小像素區塊，對齊 clippy 要求 | 上游保留空影格判定語意，capture 測試與 clippy 通過 |
 | `crates/windows/src/system/capture/gdi_surface.rs` | GDI 建立螢幕 DC 前先附掛輸入桌面 | 上游有等效桌面處理，隔離環境 GDI capture 測試通過 |

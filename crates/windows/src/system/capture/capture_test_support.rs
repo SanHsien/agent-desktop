@@ -50,8 +50,9 @@ pub(crate) fn live_graphics_capture_lock() -> MutexGuard<'static, ()> {
 pub(crate) struct HomeIsolation {
     previous_home: Option<std::ffi::OsString>,
     previous_profile: Option<std::ffi::OsString>,
+    previous_desktop_home: Option<std::ffi::OsString>,
     root: PathBuf,
-    _lock: MutexGuard<'static, ()>,
+    _lock: Option<MutexGuard<'static, ()>>,
 }
 
 impl HomeIsolation {
@@ -61,6 +62,14 @@ impl HomeIsolation {
         let lock = HOME_ENV_LOCK
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
+        Self::enter_internal(prefix, Some(lock))
+    }
+
+    pub(crate) fn enter_with_held_lock(prefix: &str) -> Self {
+        Self::enter_internal(prefix, None)
+    }
+
+    fn enter_internal(prefix: &str, lock: Option<MutexGuard<'static, ()>>) -> Self {
         let root = std::env::temp_dir().join(format!(
             "{prefix}-{}-{}",
             std::process::id(),
@@ -86,13 +95,16 @@ impl HomeIsolation {
             .status();
         let previous_home = std::env::var_os("HOME");
         let previous_profile = std::env::var_os("USERPROFILE");
+        let previous_desktop_home = std::env::var_os("AGENT_DESKTOP_HOME");
         unsafe {
             std::env::set_var("HOME", &root);
             std::env::set_var("USERPROFILE", &root);
+            std::env::remove_var("AGENT_DESKTOP_HOME");
         }
         Self {
             previous_home,
             previous_profile,
+            previous_desktop_home,
             root,
             _lock: lock,
         }
@@ -112,6 +124,10 @@ impl Drop for HomeIsolation {
         match &self.previous_profile {
             Some(value) => unsafe { std::env::set_var("USERPROFILE", value) },
             None => unsafe { std::env::remove_var("USERPROFILE") },
+        }
+        match &self.previous_desktop_home {
+            Some(value) => unsafe { std::env::set_var("AGENT_DESKTOP_HOME", value) },
+            None => unsafe { std::env::remove_var("AGENT_DESKTOP_HOME") },
         }
         let _ = std::fs::remove_dir_all(&self.root);
     }
@@ -152,6 +168,24 @@ pub(crate) fn with_restored_clipboard(body: impl FnOnce()) {
     let _ = clear(deadline(10_000));
     if let Some(text) = saved_text {
         let _ = set_content(&ClipboardContent::Text(text), deadline(10_000));
+    }
+    if let Err(panic) = body_result {
+        std::panic::resume_unwind(panic);
+    }
+}
+
+pub(crate) fn with_locked_external_desktop_home(external_home: &Path, body: impl FnOnce()) {
+    let _lock = HOME_ENV_LOCK
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let original = std::env::var_os("AGENT_DESKTOP_HOME");
+    unsafe {
+        std::env::set_var("AGENT_DESKTOP_HOME", external_home);
+    }
+    let body_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(body));
+    match original {
+        Some(val) => unsafe { std::env::set_var("AGENT_DESKTOP_HOME", val) },
+        None => unsafe { std::env::remove_var("AGENT_DESKTOP_HOME") },
     }
     if let Err(panic) = body_result {
         std::panic::resume_unwind(panic);

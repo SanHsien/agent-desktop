@@ -37,12 +37,17 @@ Unicode 環境區塊 -> cmd /U 寫 UTF-16LE -> 嚴格 UTF-16LE 解碼
   - 成因：`cmd.exe /C set` 在繁體中文 Windows 預設使用碼頁 950 寫檔，原測試以 `read_to_string` 要求 UTF-8 造成非 ASCII 變數解碼失敗。
   - 處置：既有 commit `85a1e5a2`（2026-11-03）已修正，改傳 `/D /U` 並嚴格以 UTF-16LE 解碼，同時注入非 ASCII 合成 probe `\u{6e2c}\u{8a66}\u{1f680}` 保證跨語系正確性。先紅後綠證據見 `85a1e5a2`。
 
-### 2. 成因未證實（懷疑與環境變數或私有 DACL 相關）：2 筆
+### 2. 測試環境隔離缺陷（隔離漏洞已修；11-02 成因仍未證實；taskbar 未實測）：2 筆
 - `system::capture::capture_envelope_parity::routing::clipboard_image_default_path_travels_private_seam_reparse_and_owner`
   - 2026-11-07 本機重現輸出：`reparse tmp must refuse private write: Object {"height": Number(2), "path": "...", ...}`
 - `system::shell::shell_surface_open::command_live_tests::opening_the_taskbar_round_trips_without_raising_anything`
   - 2026-11-07 本機重現輸出：`the snapshot consumes the open surface's identity: Adapter(AdapterError { code: Internal, message: "private file DACL grants an untrusted principal", ...})`
-  - 觀察：在 2026-11-07 某次以命令列指定未設私有 DACL 之 `AGENT_DESKTOP_HOME` 的測試指令中，重現了上述 junction 繞過與 private DACL 拒絕；但在乾淨環境或透過 `scripts/cargo-test-isolated-home.sh` 執行時兩筆均通過。2026-11-02 維護者本機是否設有該變數未曾記錄，且隔離腳本未主動清除該變數，故其是否為 2026-11-02 失敗原因屬成因未證實，列入後續觀察列。
+  - 觀察與處置：隔離漏洞已修；11-02 成因仍未證實；taskbar 未實測。
+    - 成因分析：`crates/windows/src/system/capture/capture_test_support.rs` 的 `HomeIsolation::enter` 原僅重設 `HOME` 與 `USERPROFILE`，未清除 `AGENT_DESKTOP_HOME`。依 `crates/core/src/storage/state_root.rs:33`，若執行環境設定了 `AGENT_DESKTOP_HOME`，將優先使用該外部目錄，導致測試脫離隔離 scratch 目錄，使 `clipboard_image_default_path_travels_private_seam_reparse_and_owner` 寫入外部目錄而繞過隔離目錄中的 `tmp` junction。2026-11-02 維護者本機是否設有該變數未曾記錄，故其是否為 11-02 失敗原因仍未證實；taskbar 該筆亦未在外部設定該變數下單獨重測。
+    - 處置：在 `HomeIsolation::enter` 同步清除 `AGENT_DESKTOP_HOME` 並於 `Drop` 還原，並於 `capture_routing_parity_tests.rs` 新增單元測試 `home_isolation_isolates_state_root_when_external_agent_desktop_home_is_set` 完成先紅後綠實證：
+      - 先紅輸出：`thread 'system::capture::capture_envelope_parity::routing::home_isolation_isolates_state_root_when_external_agent_desktop_home_is_set' panicked at crates\windows\src\system\capture\capture_routing_parity_tests.rs:150:9: state root must land inside HomeIsolation root, got: %TEMP%\external-home-44344`
+      - 後綠輸出：`test system::capture::capture_envelope_parity::routing::home_isolation_isolates_state_root_when_external_agent_desktop_home_is_set ... ok`
+      - 修復後即使外部環境設定 `AGENT_DESKTOP_HOME`，`clipboard_image_default_path_travels_private_seam_reparse_and_owner` 亦穩定通過（exit 0）。
 
 ### 3. 測試環境假設（並行負載逾時 / 桌面動畫逾時）：4 筆
 - `system::capture::capture_envelope_parity::tests::screenshot_path_and_inline_data_shapes_match_core_serialization`
