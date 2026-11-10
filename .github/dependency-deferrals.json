@@ -28,14 +28,6 @@
     "actions/upload-artifact": {
       "deferredLatest": "7.0.2",
       "reason": "Pin in upstream-owned workflow files that this fork leaves identical to upstream/main on the pinned lines; the floor moves when the fork syncs upstream. Reviewed 2026-11-02 at 7.0.2 (docs/fork/DECISIONS.md, ADR-006 point 3)."
-    },
-    "github/codeql-action/analyze": {
-      "deferredLatest": "4.39.1",
-      "reason": "Pin in upstream-owned workflow files that this fork leaves identical to upstream/main on the pinned lines; the floor moves when the fork syncs upstream. Reviewed 2026-11-02 at 4.39.1 (docs/fork/DECISIONS.md, ADR-006 point 3)."
-    },
-    "github/codeql-action/init": {
-      "deferredLatest": "4.39.1",
-      "reason": "Pin in upstream-owned workflow files that this fork leaves identical to upstream/main on the pinned lines; the floor moves when the fork syncs upstream. Reviewed 2026-11-02 at 4.39.1 (docs/fork/DECISIONS.md, ADR-006 point 3)."
     }
   }
 }
