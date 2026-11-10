@@ -22,7 +22,7 @@ Computer use for AI agents: read and operate desktop apps through the OS accessi
 
 A CLI and C library for macOS, Windows and Linux. A snapshot returns JSON with a ref for every element an agent can act on. The agent acts on a ref and snapshots again to check, with no pixel matching; the loop stays in your agent.
 
-On macOS, CLI calls reuse a private command host for each snapshot namespace and binary build. It retains native accessibility objects so a removed row cannot silently resolve to a surviving row with the same identifier. The host exits after 15 idle minutes. `TMPDIR` must be owned by the current user with mode `0700`; the standard macOS per-user temporary directory satisfies this requirement. Headless calls still prohibit foreground activation and synthesized input.
+On macOS, refs re-identify their element through the element's own accessibility address; the private command host was removed in upstream v1.1.0 (#414). Headless calls still prohibit foreground activation and synthesized input.
 
 Snapshots, clipboard reads, screenshots, command output and debug artifacts can contain private desktop content. Keep them out of public logs and uploads. The optional [JEV helper](skills/jev-desktop/SKILL.md) sends screen descriptions to a configured model provider; it is separate from the native CLI. See [privacy and data handling](docs/faq.md#what-data-can-contain-private-information).
 
@@ -39,7 +39,7 @@ Bun, Yarn and pnpm can install the same package. It includes native binaries and
 For direct execution without a JavaScript launcher, download the matching native archive from
 [GitHub Releases](https://github.com/vercel-labs/agent-desktop/releases) and keep its helper beside the executable.
 
-Official Homebrew and Scoop packages are being submitted; they are not yet available in the default catalogs.
+On macOS and Linux, Homebrew also works: `brew install agent-desktop`. There is no official Scoop package yet.
 The repository no longer maintains a custom Homebrew tap or Scoop bucket.
 
 - **macOS** needs Accessibility permission: `agent-desktop permissions --guide`.
@@ -61,7 +61,7 @@ agent-desktop snapshot --app Finder -i      # observe again to verify
 
 ```json
 {
-  "version": "2.5",
+  "version": "2.6",
   "ok": true,
   "command": "snapshot",
   "data": {
@@ -149,6 +149,16 @@ The Windows surface and `launch` notes and the Linux X11 and Wayland notes are i
 
 `agent-desktop skills get platform` prints the full capability table for the OS you run on.
 
+## MCP server and stdin input (upstream v1.2.0 and later)
+
+`agent-desktop mcp` serves every command as an MCP tool over stdio. A tool is named `desktop_` plus its command (`desktop_snapshot`, `desktop_click`), takes that command's arguments, and returns its JSON envelope:
+
+```json
+{ "mcpServers": { "agent-desktop": { "command": "agent-desktop", "args": ["mcp"] } } }
+```
+
+`type`, `set-value`, and `clipboard-set` accept `--stdin` for piped text, which keeps it out of process arguments. Batch JSON text does appear in process arguments, so run secret steps as separate commands.
+
 ## Language bindings
 
 Each release also ships `libagent_desktop_ffi` for macOS, Linux and Windows, so a program can call the tool in process instead of starting the CLI for each command. `agent-desktop skills get ffi` covers the entry points, memory ownership and threading rules.
@@ -158,7 +168,7 @@ import ctypes
 lib = ctypes.CDLL("./lib/libagent_desktop_ffi.dylib")
 lib.ad_adapter_create.restype = ctypes.c_void_p
 lib.ad_adapter_destroy.argtypes = [ctypes.c_void_p]
-assert lib.ad_init(6) == 0  # AD_RESULT_OK when the header's AD_ABI_VERSION_MAJOR matches the library
+assert lib.ad_init(7) == 0  # AD_RESULT_OK when the header's AD_ABI_VERSION_MAJOR matches the library
 adapter = lib.ad_adapter_create()
 lib.ad_adapter_destroy(adapter)
 ```

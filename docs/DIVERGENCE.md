@@ -1,8 +1,8 @@
 # 產品檔案與上游的差異
 
-Base: `9eb9b296192fcb70bda25e918cd6dd66abfa3d0d`
+Base: `2b0a7334fc111730454b726e6800aa41cdafc093`
 
-基準為上游 `main` 的 `Video remove (#421)`。本表只列 `crates/`、`src/`、`apps/`、`npm/` 的差異；fork 維護文件、工具與 workflow 見 [FORK.md](../FORK.md)。來源為 `8d372752` 的 Windows 修正、`0f7e8e65` 的格式整理及 `a67bf683` 的測試拆檔。
+基準為上游 v1.2.0 release commit `chore: release 1.2.0 with mcp support (#568)`（2026-11-10 自 `9eb9b296` 的 `Video remove (#421)` 移來，逐檔差異集合不變，見 ADR-009）。本表只列 `crates/`、`src/`、`apps/`、`npm/` 的差異；fork 維護文件、工具與 workflow 見 [FORK.md](../FORK.md)。來源為 `8d372752` 的 Windows 修正、`0f7e8e65` 的格式整理及 `a67bf683` 的測試拆檔。
 
 ## 檢查與移除
 

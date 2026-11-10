@@ -102,7 +102,7 @@
 | issue #417（ARM64 結束時崩潰） | 不適用 | 本 fork 只發 x86_64 | 改發 ARM64 |
 | 其餘 issue | 不適用或等上游 | macOS／Linux 專屬為主；只用標題分類 | 下次 release 審查 |
 | 已合併但 base 不是 `main` 的 PR（82 筆；標題含 `windows`／`win32`／`uia` 的 30 筆，#445、#447 在 baseline 舊 notes 被點名） | 55 筆內容已隨 commit 軸進入；25 筆不適用；2 筆（#445、#447）等合併 | 2026-11-02 唯讀 `gh pr list --state all` 依 head 分支追堆疊。**55 筆**（含標題含 windows 的 28 筆）的最底層收口 PR 已合進 `main`，merge commit 是 `upstream/main` 的祖先：`feat/windows-adapter` 的 32 筆經 #110（`483a31d0`），`ctate/*` 經 #342、#345、#347，其餘經 #67、#77、#93、#137；沒有逐筆驗證堆疊內每個 commit 都在該 merge 之前進入分支。**25 筆**在 `feat/linux-adapter` 的堆疊，收口 PR #298 已關閉未合併；其中標題含 windows 的 #290、#305 內容是 Linux 轉接層，本 fork 只發 Windows 版。**2 筆**（#445、#447）在 `laf/identity-linux-windows`，收口 PR #442 開著，且 base 是 `laf/identity-lean`（其上還有開著的 #441，base `laf/remove-macos-host`），不是 `main`；後面的鏈沒有追完 | #442 合併進 `main`、#298 重開或其分支進 `main`、或 `Upstream check` 在新 release 後列出相關項目 |
-| 分支軸 | 不開 | API 列出 177 個上游分支；本輪未逐一比對未開 PR 的分支 | 上游開長期分支 |
+| 分支軸 | 不開 | API 列出 177 個上游分支；當時未逐一比對未開 PR 的分支 | 上游開長期分支 |
 
 - **產品差異清單**：逐檔理由、移除條件與比對方式見 [DIVERGENCE.md](../DIVERGENCE.md)；`tools/check_divergence.py` 核對 `crates/`、`src/`、`apps/`、`npm/`，漏列或多列會失敗。
 - **水位軌道**：`track: release` 加 `ticket_cutoff: release`。理由見 [`UPSTREAM.md`](UPSTREAM.md) 第 4 節。
@@ -118,3 +118,55 @@
 - **脈絡**：fork 的 `v1.0.2` tag 指向 `5d82883d`，上游的 `v1.0.2` 是 `a47ed664`，同名不同物，讀版本號的人會以為兩者相同。沒有文件或工具引用舊的下載網址（查過本 repo、`ai-inbox`、`agent-assets`）。
 - **決策**：release 與 tag 改名 `fork-v1.0.2`，刪除 fork 上的 `v1.0.2` tag；commit、資產與內容不變。不把 `v1.0.2` 強推回上游的 commit：要比對上游 tag 用 `git ls-remote upstream`。之後 fork 的 release 一律用 `fork-` 前綴。維護者授權決定。
 - **代價**：`releases/tag/v1.0.2` 與 `releases/download/v1.0.2/*` 的舊連結失效。
+
+---
+
+## ADR-009: 第二次上游審查，合併 v1.2.0（2026-11-10）
+
+- **日期**：2026-11-10
+- **狀態**：Accepted
+- **觸發**：`Upstream check` 2026-11-09 failure；上游 2026-11-04 發 `v1.2.0`（`2b0a7334`，`git ls-remote upstream 'refs/tags/v1.*'`：`v1.1.0` 為 `d3dc190a`）。
+- **快照**：`git fetch upstream --no-tags` 後 `upstream/main` 為 `ab7dfb21`；`git rev-list --left-right --count HEAD...upstream/main` 在審查前為 `19 20`（報告檔寫的 35／36 是相對 baseline `a47ed664` 的數字）。release 軌只審到 `v1.2.0`：release 之後的 4 個 main commit（`5e0491ae`、`b43ac4f6`、`77149fd3`、`ab7dfb21`）留給下一個 release。
+- **commit 軸**：檢查器列 32 個 `a47ed664` 之後的 commit；其中 16 個（`0768da4` 至 `9eb9b29`）本來就是本 fork 的 merge base `9eb9b296` 的祖先（`git merge-base --is-ancestor <hash> HEAD` 逐一為真）。其餘 16 個是 `7b69db7`、`b4926b5`、`0dd484f`、`060c83a`、`31b757a`、`d3dc190`、`8b7fa26`、`93ae89e`、`17467da`、`87f4f41`、`6660fba`、`c463bce`、`53e072d`、`97125f6`、`d83bfaf`、`2b0a733`，共 `git diff --shortstat 9eb9b296 2b0a7334` 的產品、文件與依賴變更。
+- **決策：合併 `2b0a7334`**（`git merge --no-ff`，不是挑揀）。理由與證據：
+  1. 衝突面極小：本 fork 的 34 個產品檔與上游這 16 個 commit 的檔案集合只重疊 `crates/windows/src/tree/hit_test/envelope_tests.rs`（`comm -12` 兩邊的 `git diff --name-only`），該檔自動合併，fork 那一行（occluded 測試預算 80 改 1000 ms）仍在；文字衝突只有 `README.md`。`git merge-tree --write-tree HEAD 2b0a7334` 事先給出同樣結論。
+  2. 逐檔差異集合不變：合併後 `git diff --name-only --no-renames 2b0a7334 -- crates src apps npm` 仍是 34 檔，和 `docs/DIVERGENCE.md` 相同，只把 Base 從 `9eb9b296` 改到 `2b0a7334`；`python tools/check_divergence.py` exit 0。
+  3. 該 commit 範圍含 ROADMAP 中期列的觸發條件（#442 合進 `main`、上游發 1.1.0）。
+- **README 處理**：`README.md` 是 fork 自己的中文版，衝突取 fork 側整份，不採上游改寫；`README.en.md` 是 fork 自己的檔，不受影響。依上游事實補了兩處：`agent-desktop mcp` 與 `--stdin` 的簡短說明（兩份 README 各一段），以及 `ad_init(6)` 改 `ad_init(7)`、範例 envelope `"version": "2.5"` 改 `"2.6"`，對照 `AD_ABI_VERSION_MAJOR`（標頭為 7）與 `ENVELOPE_VERSION`（`crates/core/src/response/output.rs:7`）。`ad_init(6)` 在合併後的 `cargo test -p agent-desktop` 使 `documented_abi_major_matches_the_header` 失敗（`README.md documents ABI major 6`，左 6 右 7），改後通過。
+- **這次合併帶來的行為風險（未做 Windows live 驗證）**：#442 刪除 Windows 的 Chrome 修復與路徑回退解析（`crates/windows/src/tree/resolve/resolve_chrome_repair.rs`、`resolve_pair_window.rs` 及 6 個測試檔），改走上游的 capture rule。Windows lib 測試數因此從 1549 筆測試名（合併前，`1543 passed; 0 failed; 6 ignored`）變成 1488 筆（合併後 `1482 passed; 0 failed; 6 ignored`），減少的名稱全在 `tree::resolve::*`（`comm` 比對兩份 `cargo test` 輸出）。單元測試與 fixture 測試通過，但 Chromium／Electron 的 ref 重解析沒有人在真實桌面上跑過。**fork 不得在 live E2E 通過前發新的 fork release**（ROADMAP 有對應列）；維護者本機已安裝的 `npm/bin` 二進位不受這次原始碼合併影響。
+- **PR 軸（#477 至 #569，63 筆）**：2026-11-10 唯讀 `gh pr list --state all --limit 400` 取得中繼資料，63 筆逐筆 `gh pr diff` 取回全文並對新增行掃隱藏內容（長空白夾內容、`eval(`、`new Function(`、200 字元以上 base64、零寬與方向控制字元）：命中 #490、#506、#528、#549，看過都是 Markdown／shell 註解對齊空白、Objective-C 續行對齊、檔首 BOM（#549 `scripts/jev/run.integration.test.mjs`），沒有隱藏內容。程式碼層級讀過的只有 #530、#536、#543（Windows 輸入、npm shim、靜態 CRT）、#531、#560、#483 的關鍵片段；其餘依標題加檔案清單分類，**沒有逐行讀**。9 筆合併進 `main`、4 筆合併進堆疊分支、49 筆開著、1 筆關閉未合併（#546，與 #547 同一 head `984f53e2`）。
+
+| 項目 | 判定 | 證據 | 重看條件 |
+| --- | --- | --- | --- |
+| 已合併進 `main` 的 9 筆：#480、#481、#502、#503、#508、#511、#519、#524、#568 | 已併入（本次合併） | 對應 commit `31b757a`、`17467da`、`060c83a`、`8b7fa26`、`d3dc190`、`93ae89e`、`6660fba`、`87f4f41`、`2b0a733` 皆為 `2b0a7334` 的祖先；#480 動 Windows 3 檔、core 22 檔，#519 是 `agent-desktop mcp` | 下次 Windows live E2E |
+| 合併進堆疊分支的 4 筆：#482、#525、#526、#564 | #482、#525：內容隨收口 PR #480、#519 進入；#526、#564：不適用 | #482、#525 的檔案路徑在 `2b0a7334` 都存在（不逐 blob 比對）；#526 收口的 #506 是 macOS VM sandbox 且開著；#564 只動 `crates/macos` 2 檔 | #506 合併；改發 macOS |
+| #442（已合併）身分解析重構，帶入 #445、#447 | 已併入（本次合併），見上方風險 | ROADMAP 中期列「同步上游堆疊分支」的觸發條件成立；`0dd484f` 289 檔；#445 的 7 個、#447 的 100 個路徑全在 `2b0a7334` | Windows live E2E、或 Chromium ref 解析回報問題 |
+| #530（open，head `6af4b796`）Windows 標點鍵與導覽鍵 extended 旗標 | 等合併，釘 head | 讀過程式碼：`keyboard_event.rs` 加 `KEYEVENTF_EXTENDEDKEY`、`keyboard_map.rs` +73、diff 新增 7 個 `#[test]`；對應 issue #513。fork 有 Windows `press`，但本機沒遇到 | 合併、head 變動、或本機遇到標點鍵被拒／Shift+方向鍵不選取 |
+| #543（open，head `f6cdfb22`）靜態連結 MSVC runtime | 等合併，釘 head | 讀過程式碼：`.cargo/config.toml` 加 `+crt-static`、新增 PE 匯入檢查腳本；對應 issue #542。維護者本機已有 VC++ runtime；`.cargo/config.toml` 會改所有 Windows 建置，不在審查中順手改 | 合併、head 變動、或 fork 的 release 在乾淨機器無法啟動 |
+| #483（open，head `a70d0177`）hosted app 的 list-apps／close-app | 等合併，釘 head | 讀過程式碼：`frame_identity::agent_facing_owner`；+179/-44，改 `window_ops.rs`、`close.rs`；與 issue #555 同一類 | 合併、head 變動 |
+| #561（open，head `524c1d88`）深層觀測與 ref 讀取 deadline | 等合併，釘 head | +998/-63，28 檔含 `crates/windows/src/system/private_file/replace.rs`、`tree/walk/walker.rs`；對應 issue #558 | 合併、head 變動 |
+| #560（open，head `e222c6b5`）Windows 儲存層 state-root 擁有者與 private-file 路徑穿越 | 等合併，釘 head | 讀過程式碼片段：`crates/core/src/storage/state_root.rs` +153、`private_file_parent.rs` +83，新增 `windows-sys` 依賴；PR 自稱安全修補，本次沒有重現 | 合併、head 變動 |
+| #521、#565、#490、#531、#536 | 等合併 | #521 Chromium 工具列 popover（+371/-13，Windows 17 檔）；#565 選取文字（+3948，91 檔，19 個 Windows 檔）；#490 Dogwood 政策（+8879，100 檔，帶 `crates/policy` 與 Cargo.lock +1530）；#531 `type` 被拒時建議 `set-value`（core + skill）；#536 npm shim 相對路徑（讀過）。體量大或只影響 npm 安裝／文件，未見 fork 的現行問題 | 合併進 `main` |
+| #517、#520、#549（`scripts/jev`） | 不適用 | jev 是上游範例腳本，fork 不使用；#549 的檔首 BOM 已確認無害 | fork 開始用 jev |
+| 跨平台 core／CLI 修正：#477、#488、#489、#496、#497、#498、#500、#538、#547（#546 為其重複，已關閉）、#523 | 等合併 | 皆在 `crates/core` 或 `src/`、`npm/bin`，標題為競態與狀態讀取修正；不碰 fork 的 34 個差異檔 | 下次 release 審查 |
+| macOS 專屬：#484、#485、#493、#495、#499、#501、#504、#505、#506、#528、#541、#544、#551、#553、#556、#566 | 不適用 | 動 `crates/macos`、`tests/native`、Objective-C；#528 有 1 行 `crates/windows/src/system/cursor_overlay/pipe_name.rs` 的重新命名，隨它合併 | 改發 macOS |
+| Linux、文件、依賴、CI：#514、#515、#518、#522、#527、#535、#539、#540、#557、#563 | 不適用或等合併 | #515 是 `Cargo.toml` default-members 加 `AGENTS.md` 一行；#539、#540 是上游依賴 bump，依 ADR-006 隨上游同步 | 下次 release 審查 |
+
+- **issue 軸（#478 至 #569，25 筆）**：只用標題與內文是否提到 Windows 分類，沒有逐筆重現。
+
+| 項目 | 判定 | 證據 | 重看條件 |
+| --- | --- | --- | --- |
+| #513、#532、#542、#558 | 等對應 PR 合併 | 分別對應 #530、#536、#543、#561（open） | PR 合併，或本機遇到 |
+| #478、#555、#487、#486 | 監看 | Windows 視窗與 app 身分／最小化視窗的回報；#478 回報環境是 Windows 10，本機是 Windows 11；#555 與 #483 同一類；沒有已合併的修正 | 上游修復，或本機遇到 |
+| #567、#569 | 監看 | Windows 無頭 UIA 動作啟動背景視窗（AutoSetFocus）、提權視窗快照空白卻回 `complete: true`；與本 fork 無頭使用最相關，無 PR | 上游修復，或本機遇到 |
+| #479、#552 | 監看 | Word 內文未暴露、`launch calc` 逾時等滿；無 PR | 上游修復，或本機遇到 |
+| #562 | 不適用 | EnumWindows 在 Codex sandbox 失敗；ADR-007 已記 `window_enum.rs` 的 `attach_input_desktop()`，fork 的 34 檔差異包含它 | Agent 子 shell 又出現 `EnumWindows failed` |
+| #510、#537 | 等對應 PR 合併 | #510 對應 #515；#537 對應 #538；AGENTS.md 已規定分平台 cargo | PR 合併 |
+| #512 | 不適用 | `scripts/jev` | 見 #517 |
+| #491、#492、#494、#529、#533、#534、#548、#550、#554 | 不適用 | macOS／Linux 專屬或跨平台建議；#554（MCP stdio）已關閉 | 改發 macOS／Linux |
+
+- **水位**：`reviewed_through` 設為 `2b0a7334`、`reviewed_release` 為 `v1.2.0`、`reviewed_pr_through` 為 569、`reviewed_issue_through` 為 577（檢查器列出的上限，不得更高，否則 release 之後開的項目被永久隱藏）。`monitored` 在 #456、#400 之外新增 #530、#543、#483、#561、#560 的 head（皆為 2026-11-10 唯讀 `gh pr view` 的值）；#456、#400 仍 open 且 head 未變。
+- **移植 #522（open，head `a56aad93`，+1/-1）**：`scripts/check-architecture.sh` 在合併前後的 Windows 都 exit 1（`self-test: G11 did not fire for its planted case in crates/core/src/tree/mod.rs`；`docs/fork/WINDOWS-LIB-TESTS.md` 的「本機門禁範圍」已記同一訊息），`.githooks/pre-commit` 的 Architecture boundaries 因此拒絕提交。讀 #522：自測把 `@ABS@` 換成 Windows 路徑（反斜線）而 G11 以正斜線比對。先紅：改前 `bash scripts/check-architecture.sh` exit 1，輸出同上；後綠：套用 #522 的一行（`tmp` 改 `tmp.replace(os.sep, "/")`）後 exit 0，輸出 `architecture check passed`。這個檔屬上游持有但不在 `check_divergence.py` 的範圍（`crates`、`src`、`apps`、`npm`），所以登記在 `FORK.md` 第 2 節表中；上游合併 #522 後同步取上游版本。
+- **合併後閘門**：`cargo fmt --all -- --check`、四套件 `clippy --all-targets -D warnings` 皆 exit 0；`cargo test -p agent-desktop-core --lib` 第一次跑有 1 筆失敗（`trace::trace_read::input_tests::concurrent_session_writers_share_the_remaining_event_budget`，parent 自己的 `emit` 回 `lock_timeout`，與此測試在合併前的檔案就存在）；單獨重跑 3 次各 exit 0、再跑整個 core lib 也 exit 0（1585 筆），判定為負載造成的鎖逾時，不是合併造成；`cargo test --no-fail-fast -p agent-desktop -p agent-desktop-ffi --tests` exit 0，其中只有 README 的 ABI major 一筆因合併失敗，已改文件。
+- **pre-commit 的 lib 測試**：第一次提交時 `.githooks/pre-commit` 的全套 `cargo test --lib` 為 `1479 passed; 3 failed; 6 ignored`，3 筆都在 `system::launch::tests::live::`（`bare_name_never_chooses_planted_binary_in_current_directory` 的 `image path` panic，另兩筆是它毒化 notepad 鎖後的 `PoisonError`）。審查實測：乾淨 `c34b8b9f` 的二進位在同環境也可重現，成敗取決於 HOME／USERPROFILE 目錄的狀態加平行執行；新建空的暫存 HOME 時 `cargo test` 通過，`--test-threads=1` 與 PowerShell 也通過。不是這次合併造成，也不是桌面競態。提交時以新建、空的暫存目錄作 HOME 與 USERPROFILE 跑 hook，不跳過。
+- **Windows lib 測試**：ROADMAP 記載的 8 筆失敗在乾淨 `c34b8b9f` 的 `cargo test -p agent-desktop-windows --lib`（HOME、USERPROFILE 指到暫存目錄、未設 `AGENT_DESKTOP_HOME`，BelowNormal）為 `1543 passed; 0 failed; 6 ignored`，沒有重現；與 `docs/fork/WINDOWS-LIB-TESTS.md` 的分類（多為並行負載逾時與桌面競態）一致，不代表那 8 筆已被消除。

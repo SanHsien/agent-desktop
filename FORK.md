@@ -39,9 +39,10 @@
 | `ROADMAP.md` | 本 fork 之後要做什麼的單一真相源 |
 | `tools/check_upstream_updates.py`、`tools/upstream_baseline.json`、`.github/workflows/upstream-check.yml` | 每週列出上游水位之後的新 commit、PR、issue；檢查器為艦隊標準版（目前與 `repo-fleet-ops` 正本同版，sha1 `c484ddbc…`，正本更新後再換），差異只放 baseline |
 | `tools/check_dependency_freshness.py`、`.github/dependency-deferrals.json`、`.github/workflows/dependency-freshness.yml` | 每月比對 Cargo 與 Actions 宣告的下限和現行版 |
+| `scripts/check_architecture.py` | 自測樹的 `@ABS@` 以 `tmp.replace(os.sep, "/")` 寫入（上游 PR #522 的一行修正，PR 仍 open）；沒有它，Windows 上 `scripts/check-architecture.sh` 與 pre-commit 的 Architecture boundaries 因「G11 did not fire」exit 1。上游合併 #522 後，同步時取上游版本、刪除此列 |
 | `tests/fork/test_fork_tools.py` | 上述兩支檢查器與其接線的性質測試 |
 
-上游持有的程式碼（`crates/`、`src/`、`apps/`、`npm/`）**不是**原樣保留：本 fork 在 `crates/`、`src/` 帶著 Windows 修正（`8d372752`、`0f7e8e65`、`a67bf683`），與上游 `main` 差 32 個產品檔（2026-11-02 `git diff --name-only "$(git merge-base upstream/main HEAD)" HEAD -- crates src apps npm`）。逐檔理由與移除條件見 [docs/DIVERGENCE.md](docs/DIVERGENCE.md)；`python tools/check_divergence.py` 以 DIVERGENCE.md 釘住的 Base 檢查清單是否與工作樹一致，`--target HEAD` 檢查 commit。
+上游持有的程式碼（`crates/`、`src/`、`apps/`、`npm/`）**不是**原樣保留：本 fork 在 `crates/`、`src/` 帶著 Windows 修正（`8d372752`、`0f7e8e65`、`a67bf683`），與上游差 34 個產品檔（2026-11-10 `git diff --name-only --no-renames 2b0a7334 -- crates src apps npm`，基準是已併入的 `v1.2.0`）。逐檔理由與移除條件見 [docs/DIVERGENCE.md](docs/DIVERGENCE.md)；`python tools/check_divergence.py` 以 DIVERGENCE.md 釘住的 Base 檢查清單是否與工作樹一致，`--target HEAD` 檢查 commit。
 
 本 fork 自己的 release 名為 `fork-v1.0.2`（`5d82883d`，只有 Windows x64），2026-11-02 由 `v1.0.2` 改名，避免與上游的 `v1.0.2`（`a47ed664`）同名不同物。之後 fork 的 release 一律用 `fork-` 前綴，見 [`docs/fork/DECISIONS.md`](docs/fork/DECISIONS.md) ADR-008。上游主要文檔以英文為準。
 

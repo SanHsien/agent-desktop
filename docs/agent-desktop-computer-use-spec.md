@@ -60,7 +60,7 @@
 ┌──────────────────┐             ┌──────────────────┐             ┌──────────────────┐
 │   Windows UIA    │             │   macOS AX API   │             │   Linux AT-SPI   │
 │ UI Automation    │             │ AXUIElementCopy  │             │ D-Bus org.a11y   │
-│ IUIAutomation    │             │ Command Host     │             │ AtspiAccessible  │
+│ IUIAutomation    │             │ AX address refs  │             │ AtspiAccessible  │
 └──────────────────┘             └──────────────────┘             └──────────────────┘
 ```
 
@@ -75,10 +75,10 @@
    - **底層原理**：Windows 透過 Window Station（如 `WinSta0`）與 Desktop（如 `default`）進行視窗與輸入事件隔離。
    - **加固解法**：在需要枚舉完整桌面視窗時，必須於乾淨的 Thread 呼叫 `OpenDesktop("default", ...)` 並透過 `SetThreadDesktop` 切換至互動式桌面，方能枚舉全系統頂層視窗（經實機驗證可達 600+ 視窗無死角）。
 
-### 2.2 macOS 平台：Accessibility API 與 Command Host
+### 2.2 macOS 平台：Accessibility API
 
 - 透過 `AXUIElement` 家族 API 與系統輔助引擎互動。
-- 具備專屬的 Command Host 程序，避免物件生命週期在非同步垃圾回收或程序釋放時出現懸空指標。
+- 上游 v1.1.0 起（#414、#441）已移除 macOS 的 Command Host 常駐程序，ref 改由元素自身的 accessibility address 重新辨識；本 fork 只發 Windows 版，此節僅作跨平台背景。
 - 支援標準 Application Menu、Sheet 與 Notification Center 語意表面。
 
 ### 2.3 Linux 平台：AT-SPI2 D-Bus 引擎

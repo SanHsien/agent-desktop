@@ -3,14 +3,19 @@
   "branch": "main",
   "track": "release",
   "ticket_cutoff": "release",
-  "reviewed_through": "a47ed664e0db00d1d4df364eb3fe8a5599882f3c",
-  "reviewed_release": "v1.0.2",
-  "reviewed_date": "2026-11-02",
-  "reviewed_pr_through": 476,
-  "reviewed_issue_through": 465,
+  "reviewed_through": "2b0a7334fc111730454b726e6800aa41cdafc093",
+  "reviewed_release": "v1.2.0",
+  "reviewed_date": "2026-11-10",
+  "reviewed_pr_through": 569,
+  "reviewed_issue_through": 577,
   "decision_log": "docs/fork/DECISIONS.md",
   "monitored": [
     {"item": "pr#456", "head": "c3732813d41bb2d3e719a8a915006da2c444ec11", "state": "open"},
-    {"item": "pr#400", "head": "e721d98cb1b983bda3657c4655b36829dc1a7732", "state": "open"}
+    {"item": "pr#400", "head": "e721d98cb1b983bda3657c4655b36829dc1a7732", "state": "open"},
+    {"item": "pr#530", "head": "6af4b7966e60e83cf98d962768a927f3ec2f14c9", "state": "open"},
+    {"item": "pr#543", "head": "f6cdfb22bcb05347a1aba4697186ad14f3db456c", "state": "open"},
+    {"item": "pr#483", "head": "a70d017798e20506e0b92b753539ccdd42ba34f8", "state": "open"},
+    {"item": "pr#561", "head": "524c1d88884b33d32099842e304b3c635f35fff3", "state": "open"},
+    {"item": "pr#560", "head": "e222c6b50d5c3981188ad7bb9d7e823a2c0d7382", "state": "open"}
   ]
 }

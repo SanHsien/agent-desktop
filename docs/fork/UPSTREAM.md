@@ -72,9 +72,9 @@ git push origin main
 | 2 | 檢查沒做完（`git`／`gh` 失敗、清單到上限還沒碰到水位、上游改寫歷史）；**不是**「沒有新東西」 |
 
 - `track: release` 加 `ticket_cutoff: release`：上游幾天就有數十筆 PR／issue，只在新 release 出現時才要求審查；release 之後才開的項目留到下一輪。
-- `reviewed_through`／`reviewed_release`：已審到的上游 release。2026-11-02 起點是 `v1.0.2`（`a47ed664`）；commit 軸另記：本 fork 是上游 `main` `9eb9b296` 加自己的 commit，上游沒有未併入的 commit。
-- `reviewed_pr_through`（#476）、`reviewed_issue_through`（#465）：2026-11-02 以 `state=all` 讀 API 的當時最大號，結論逐項寫在 [`DECISIONS.md`](DECISIONS.md) ADR-007；不是「沒看過就設成最大號」。
-- `monitored` 釘住 PR #456、#400 審過的 head 與狀態；漂移就轉紅，回 ADR-007 重看。
+- `reviewed_through`／`reviewed_release`：已審到的上游 release。2026-11-02 起點是 `v1.0.2`（`a47ed664`）；2026-11-10 審並以 `git merge --no-ff` 併入 `v1.2.0`（`2b0a7334`），本 fork 是 `2b0a7334` 加自己的 commit（ADR-009）；release 之後的上游 main commit 留給下一個 release。
+- `reviewed_pr_through`（#569）、`reviewed_issue_through`（#577）：2026-11-10 檢查器列出的上限，結論逐項寫在 [`DECISIONS.md`](DECISIONS.md) ADR-009（上一輪 #476／#465 見 ADR-007）；不是「沒看過就設成最大號」，也不得高於檢查器報告寫的上限，否則 release 之後開的項目會被永久隱藏。
+- `monitored` 釘住 PR #456、#400（ADR-007）與 #530、#543、#483、#561、#560（ADR-009）審過的 head 與狀態；漂移就轉紅，回對應 ADR 重看。
 - 審完在 `DECISIONS.md` 記結論，再推進 `tools/upstream_baseline.json`。
 - 不改檢查器程式；要改行為改艦隊正本（`repo-fleet-ops` 的 `tools/canonical/check_upstream_updates.py`）。
 - 檢查器只 fetch 上游、只讀 `gh`，從不 push，也不對上游開 PR 或 issue。

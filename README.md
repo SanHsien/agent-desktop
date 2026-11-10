@@ -108,7 +108,7 @@ agent-desktop snapshot --app "記事本" -i
 每次呼叫輸出標準 JSON Envelope：
 ```json
 {
-  "version": "2.5",
+  "version": "2.6",
   "ok": true,
   "command": "snapshot",
   "data": {
@@ -175,6 +175,18 @@ agent-desktop snapshot --app "記事本" -i
 
 ---
 
+### MCP 伺服器與 stdin 輸入（上游 v1.2.0 起）
+
+`agent-desktop mcp` 以 stdio 把每個命令公開成 MCP 工具，工具名稱為 `desktop_` 加命令名（`desktop_snapshot`、`desktop_click`），參數與回傳同該命令的 JSON Envelope：
+
+```json
+{ "mcpServers": { "agent-desktop": { "command": "agent-desktop", "args": ["mcp"] } } }
+```
+
+`type`、`set-value`、`clipboard-set` 可加 `--stdin` 從標準輸入讀文字，避免機密出現在行程參數；批次 JSON 內的文字會出現在行程參數，機密步驟請分開執行。
+
+---
+
 ## 🔌 語言綁定（Language Bindings / FFI）
 
 各平台版本皆包含 C 函式庫 `libagent_desktop_ffi`（Windows 為 `agent_desktop_ffi.dll`），允許外部程式直接透過行程內記憶體呼叫，無需頻繁啟動 CLI 子程序：
@@ -184,7 +196,7 @@ import ctypes
 lib = ctypes.CDLL("./lib/libagent_desktop_ffi.dylib")
 lib.ad_adapter_create.restype = ctypes.c_void_p
 lib.ad_adapter_destroy.argtypes = [ctypes.c_void_p]
-assert lib.ad_init(6) == 0  # AD_RESULT_OK when the header's AD_ABI_VERSION_MAJOR matches the library
+assert lib.ad_init(7) == 0  # AD_RESULT_OK when the header's AD_ABI_VERSION_MAJOR matches the library
 adapter = lib.ad_adapter_create()
 lib.ad_adapter_destroy(adapter)
 ```
