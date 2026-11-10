@@ -28,6 +28,8 @@ Git 產品差異清單 + 表格
 
 | Path | Reason | Removal condition |
 | --- | --- | --- |
+| `apps/docs/pnpm-lock.yaml` | minimatch 10.2.6 升到 11.0.5、`@vercel/geistdocs` 底下的 glob 11.1.0 升到 14.0.4，以修 Dependabot 告警 #5（minimatch < 11.0.1 受影響），見 ADR-010 | 上游 `apps/docs` 的 lockfile 已解到 minimatch >= 11.0.1，且 glob 版本宣告 minimatch ^11 |
+| `apps/docs/pnpm-workspace.yaml` | `overrides` 加 `@vercel/geistdocs>glob: 14.0.4` 與 `minimatch: 11.0.5`（兩者必須一起，只升 minimatch 會讓 glob 11 的萬用字元靜默回空），見 ADR-010 | `@vercel/geistdocs` 自行依賴 glob >= 14 且 `@ts-morph/common` 宣告 minimatch >= 11.0.1，兩條 override 可刪 |
 | `crates/core/src/session/tree.rs` | 非 Unix session 根目錄也經 `ensure_private`，避免只保護 trace 子目錄 | 上游在建立 session 時同樣保護根目錄，Windows session 測試通過 |
 | `crates/ffi/src/actions/result.rs` | 釋放 action result 時用 `as_mut` 檢查空指標；單元測試移到相鄰檔案以符合 400 行限制 | 上游涵蓋空 result 與 post-state 釋放，且檔案大小及 FFI 測試通過 |
 | `crates/ffi/src/actions/result_tests.rs` | 從 `result.rs` 拆出的 action result 轉換及釋放測試，包含空 result 測試 | 上游以符合 400 行限制的佈局保留相同測試覆蓋 |
