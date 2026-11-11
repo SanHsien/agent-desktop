@@ -50,6 +50,7 @@ Git 產品差異清單 + 表格
 | `crates/ffi/src/actions/result_tests.rs` | 從 `result.rs` 拆出的 action result 轉換及釋放測試，包含空 result 測試 | 上游以符合 400 行限制的佈局保留相同測試覆蓋 |
 | `crates/ffi/tests/common/mod.rs` | Windows FFI 隔離目錄移除繼承 ACL，授權 SYSTEM、Administrators 與 Owner Rights | 上游 fixture 能在 Windows 原生環境建立被私有檔案檢查接受的隔離目錄 |
 | `crates/ffi/tests/common/win32_fixture.rs` | FFI Win32 fixture 執行緒先附掛輸入桌面 | 上游 fixture 在隔離桌面環境可建立及觀測視窗，FFI 實機測試通過 |
+| `crates/linux/Cargo.toml` | `rustix` 釘選由 `=1.1.5` 改為 `=1.1.6`，修 RUSTSEC-2026-0486（xattr 函式在零長度緩衝區把未寫入位元組標成已初始化），讓 Supply Chain 的 cargo-deny advisories 通過 | 上游釘選 `rustix` ≥1.1.6 |
 | `crates/windows/Cargo.toml` | 啟用 `Win32_System_StationsAndDesktops` 供輸入桌面附掛使用 | 上游提供等效桌面處理，或附掛呼叫全部移除後 Windows 建置通過 |
 | `crates/windows/src/input/clipboard/clipboard_bytes.rs` | UTF-16 解碼改用固定大小 `as_chunks`，對齊 clippy 要求 | 上游解碼保留尾端不完整位元組的行為，且 clippy 與剪貼簿測試通過 |
 | `crates/windows/src/input/clipboard/clipboard_files_tests.rs` | HDROP 測試的 UTF-16 解碼同步改用 `as_chunks` | 上游測試具有相同對齊與 round-trip 覆蓋，clippy 通過 |
