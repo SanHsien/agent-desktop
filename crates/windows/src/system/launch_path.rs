@@ -10,6 +10,7 @@ pub(super) fn launch_identifier(id: &str) -> Result<String, AdapterError> {
     if id.is_empty() || id.contains("..") || id.chars().any(char::is_control) {
         return Err(invalid_identifier(id));
     }
+    refuse_network_path(id)?;
     if is_absolute_launch_path(id) {
         return Ok(id.to_owned());
     }
@@ -51,6 +52,7 @@ pub(super) fn validate_launch_options(options: &LaunchOptions) -> Result<(), Ada
 }
 
 pub(crate) fn resolve_executable(id: &str) -> Result<PathBuf, AdapterError> {
+    refuse_network_path(id)?;
     if is_absolute_launch_path(id) {
         let path = PathBuf::from(id);
         if path.is_file() {
@@ -187,11 +189,35 @@ fn system_directories() -> Result<(PathBuf, PathBuf), AdapterError> {
 }
 
 fn is_absolute_launch_path(id: &str) -> bool {
-    if id.starts_with(r"\\?\") || id.starts_with(r"\\") {
-        return true;
-    }
-    let bytes = id.as_bytes();
+    let local = id.strip_prefix(r"\\?\").unwrap_or(id);
+    let bytes = local.as_bytes();
     bytes.len() >= 3 && bytes[0].is_ascii_alphabetic() && bytes[1] == b':' && bytes[2] == b'\\'
+}
+
+/// True for any path outside the local drive namespace: UNC (`\\server\share`), `\\?\UNC\`, device
+/// namespaces such as `\\.\` and `\\?\GLOBALROOT\`, and their forward-slash spellings. Only `X:\` and
+/// `\\?\X:\` are local drive paths.
+pub(super) fn is_network_path(id: &str) -> bool {
+    let mut leading = id.chars();
+    let separator = |c: Option<char>| matches!(c, Some('\\' | '/'));
+    if !(separator(leading.next()) && separator(leading.next())) {
+        return false;
+    }
+    !is_absolute_launch_path(id)
+}
+
+fn refuse_network_path(id: &str) -> Result<(), AdapterError> {
+    if !is_network_path(id) {
+        return Ok(());
+    }
+    Err(AdapterError::new(
+        ErrorCode::InvalidArgs,
+        "Launch refuses network (UNC) and device-namespace paths: opening one sends the user's NetNTLM credentials to a remote host and can run a remote executable",
+    )
+    .with_details(serde_json::json!({ "app_name": id }))
+    .with_suggestion(
+        "Copy the executable to a local drive and pass its drive-letter path, or pass a bare name under System32 / Windows.",
+    ))
 }
 
 fn is_bare_name(id: &str) -> bool {
@@ -212,9 +238,13 @@ fn invalid_identifier(id: &str) -> AdapterError {
     )
     .with_details(serde_json::json!({ "app_name": id }))
     .with_suggestion(
-        "Use a full path (drive + backslash, UNC, or \\\\?\\) or a bare name resolved only under System32 / Windows.",
+        "Use a full local path (drive + backslash, or \\\\?\\ + drive) or a bare name resolved only under System32 / Windows.",
     )
 }
+
+#[cfg(test)]
+#[path = "launch_path_network_tests.rs"]
+mod network_tests;
 
 #[cfg(test)]
 mod tests {
@@ -224,7 +254,6 @@ mod tests {
     fn absolute_and_bare_names_are_accepted() {
         assert!(launch_identifier(r"C:\Windows\System32\notepad.exe").is_ok());
         assert!(launch_identifier(r"\\?\C:\Windows\notepad.exe").is_ok());
-        assert!(launch_identifier(r"\\server\share\app.exe").is_ok());
         assert!(launch_identifier("notepad.exe").is_ok());
     }
 

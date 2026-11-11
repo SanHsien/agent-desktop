@@ -11,6 +11,8 @@ use std::time::Duration;
 use self::launch_attach::matching_processes;
 use self::launch_attach::prepare;
 use super::app_ops::ProcessRow;
+#[cfg(target_os = "windows")]
+use super::launch_path::is_network_path;
 use super::launch_path::{
     child_environment_block, image_file_name, launch_identifier, validate_launch_options,
 };
@@ -165,6 +167,12 @@ fn exact_window(
 /// against whatever directory this process happens to hold, not the caller's.
 #[cfg(target_os = "windows")]
 fn absolute_cwd(cwd: &Path) -> Result<&Path, AdapterError> {
+    if is_network_path(&cwd.to_string_lossy()) {
+        return Err(before_launch(AdapterError::new(
+            ErrorCode::InvalidArgs,
+            "The launch working directory must be on a local drive, not a network (UNC) path",
+        )));
+    }
     if cwd.is_absolute() {
         return Ok(cwd);
     }
@@ -370,6 +378,10 @@ fn should_poll_after_first_observation(timeout_ms: u64) -> bool {
 #[cfg(test)]
 #[path = "launch_tests.rs"]
 mod tests;
+
+#[cfg(all(test, target_os = "windows"))]
+#[path = "launch_cwd_tests.rs"]
+mod launch_cwd_tests;
 
 #[cfg(all(test, target_os = "windows"))]
 #[path = "launch_lease_isolation_tests.rs"]
