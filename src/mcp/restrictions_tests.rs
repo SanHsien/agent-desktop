@@ -16,9 +16,11 @@ fn batch_entry(entry: serde_json::Value) -> Commands {
 }
 
 fn root() -> PathBuf {
-    std::env::temp_dir()
+    let root = std::env::temp_dir()
         .join(format!("agent-desktop-restrictions-{}", std::process::id()))
-        .join("mcp-output")
+        .join("mcp-output");
+    std::fs::create_dir_all(&root).expect("the output directory exists, as the server makes it");
+    root
 }
 
 fn with_root(limits: Restrictions) -> Restrictions {
@@ -102,8 +104,14 @@ fn launch_batch_and_session_gc_are_off_by_default_and_each_opt_in_turns_on_only_
         file_write: true,
         ..Restrictions::default()
     });
-    assert!(only_files.check(&gc).is_ok());
+    assert!(only_files.check(&gc).is_err());
     assert!(only_files.check(&launch).is_err());
+    let only_gc = Restrictions {
+        session_gc: true,
+        ..Restrictions::default()
+    };
+    assert!(only_gc.check(&gc).is_ok());
+    assert!(only_gc.check(&launch).is_err());
 }
 
 #[test]

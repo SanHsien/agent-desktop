@@ -193,7 +193,7 @@ agent-desktop --headed mouse-move --xy 100,200
 
 | Goal | Use | Fall back to |
 |------|-----|--------------|
-| Click a button | `click @ref` | `--headed mouse-click --xy X,Y` |
+| Click a button | `click @ref` | `--headed mouse-click --xy X,Y`, only for a control with no ref path that is not an identical twin; for `AMBIGUOUS_TARGET` or twins, take a new snapshot or ask the person |
 | Fill a text field | `set-value @ref "text"` | `clear` then `type` |
 | Set a checkbox | `check` / `uncheck` | `toggle` when state is unknown |
 | Pick a dropdown option | `select @ref "Option"` | open the menu, then `snapshot --surface menu` |

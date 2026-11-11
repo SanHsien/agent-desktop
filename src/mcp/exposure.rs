@@ -16,7 +16,7 @@ pub(crate) fn tool_exposed(path: &[String], limits: &Restrictions) -> bool {
     match steps(path).as_slice() {
         ["launch"] => limits.launch,
         ["batch"] => limits.batch,
-        ["session", "gc"] => limits.file_write,
+        ["session", "gc"] => limits.session_gc,
         _ => true,
     }
 }
@@ -39,7 +39,7 @@ pub(crate) fn arg_exposed(path: &[String], arg_id: &str, limits: &Restrictions) 
         return limits.file_write;
     }
     match (steps(path).as_slice(), arg_id) {
-        (["press" | "key-down" | "key-up"], "force") | (["launch"], "cwd") => false,
+        (["press" | "key-down" | "key-up" | "close-app"], "force") | (["launch"], "cwd") => false,
         (["launch"], "cdp") => limits.cdp,
         _ => true,
     }

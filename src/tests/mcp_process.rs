@@ -195,3 +195,47 @@ fn file_output_without_a_session_stops_the_server_instead_of_guessing_a_director
     assert_eq!(output.status.code(), Some(2));
     assert!(String::from_utf8_lossy(&output.stderr).contains("--session"));
 }
+
+#[test]
+fn session_gc_has_its_own_opt_in_separate_from_file_output() {
+    let gc = listed_tools(&["--allow-session-gc"]);
+    assert!(gc.iter().any(|tool| tool == "desktop_session_gc"));
+    assert!(!gc.iter().any(|tool| tool == "desktop_launch"));
+    let session = format!("gcsplit{}", std::process::id());
+    let home = std::env::temp_dir().join(format!("agent-desktop-mcp-home-{}", std::process::id()));
+    let files = binary()
+        .args(["mcp", "--allow-file-write", "--session", &session])
+        .env("AGENT_DESKTOP_HOME", &home)
+        .stdin(Stdio::null())
+        .output()
+        .expect("binary runs");
+    let created = home.join("sessions").join(&session).join("mcp-output");
+    let made = created.is_dir();
+    let _ = std::fs::remove_dir_all(&home);
+    assert!(
+        files.status.success(),
+        "{}",
+        String::from_utf8_lossy(&files.stderr)
+    );
+    assert!(made, "the server creates the output directory at startup");
+}
+
+#[test]
+fn close_app_has_no_force_over_mcp() {
+    let responses = serve(
+        &[call(
+            1,
+            "desktop_close_app",
+            json!({ "app": "agent-desktop-no-such-app", "force": true }),
+        )],
+        &[],
+    );
+    let result = &responses[0]["result"];
+    assert_eq!(result["isError"], true, "{result}");
+    assert!(
+        result["content"][0]["text"]
+            .as_str()
+            .is_some_and(|text| text.contains("Unknown argument 'force'")),
+        "{result}"
+    );
+}

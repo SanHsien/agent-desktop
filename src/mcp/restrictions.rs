@@ -4,8 +4,11 @@
 //! confused or injected model away from the surfaces that run arbitrary code, they are not a sandbox.
 
 use agent_desktop_core::{AdapterError, AppError, DeliverySemantics, ErrorCode};
-use std::path::{Component, Path, PathBuf};
+use std::path::{Path, PathBuf};
 
+use super::confinement::{
+    env_key, is_inside, is_inspector_env_key, is_program_search_env_key, mentions_debug_endpoint,
+};
 use crate::cli::Commands;
 use crate::cli_args::{
     cursor_overlay_action::CursorOverlayAction, session::SessionAction, system::LaunchArgs,
@@ -15,7 +18,8 @@ use crate::cli_args::{
 pub(crate) const ALLOW_ENV: &str = "AGENT_DESKTOP_MCP_ALLOW";
 pub(crate) const FILE_ROOT_ENV: &str = "AGENT_DESKTOP_MCP_FILE_ROOT";
 const OUTPUT_DIR: &str = "mcp-output";
-const DEBUG_SWITCH_PREFIXES: [&str; 3] = ["remote-debugging", "remote-allow-origins", "inspect"];
+const SHORTCUT_REASON: &str = "it bypasses the blocked-shortcut list (win+r, alt+f4, ...)";
+const TERMINATE_REASON: &str = "it terminates the app's processes instead of closing it";
 
 /// The opt-ins an MCP server was started with. The default allows none of them.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -23,6 +27,7 @@ pub(crate) struct Restrictions {
     pub launch: bool,
     pub batch: bool,
     pub file_write: bool,
+    pub session_gc: bool,
     pub cdp: bool,
     pub file_root: Option<PathBuf>,
 }
@@ -35,6 +40,7 @@ impl Restrictions {
             launch: true,
             batch: true,
             file_write: true,
+            session_gc: true,
             cdp: true,
             file_root: None,
         }
@@ -51,6 +57,7 @@ impl Restrictions {
             ("launch", self.launch),
             ("batch", self.batch),
             ("file-write", self.file_write),
+            ("session-gc", self.session_gc),
             ("cdp", self.cdp),
         ]
         .into_iter()
@@ -77,6 +84,7 @@ impl Restrictions {
             launch: has("launch"),
             batch: has("batch"),
             file_write: has("file-write"),
+            session_gc: has("session-gc"),
             cdp: has("cdp"),
             file_root,
         }
@@ -85,15 +93,18 @@ impl Restrictions {
     /// Refuses `command` when it is outside the limits.
     pub(crate) fn check(&self, command: &Commands) -> Result<(), AppError> {
         match command {
-            Commands::Press(args) => self.refuse_force(args.force, command.name()),
+            Commands::Press(args) => self.refuse_force(args.force, command.name(), SHORTCUT_REASON),
             Commands::KeyDown(args) | Commands::KeyUp(args) => {
-                self.refuse_force(args.force, command.name())
+                self.refuse_force(args.force, command.name(), SHORTCUT_REASON)
+            }
+            Commands::CloseApp(args) => {
+                self.refuse_force(args.force, command.name(), TERMINATE_REASON)
             }
             Commands::Launch(args) => self.check_launch(args),
             Commands::Batch(_) => self.require(self.batch, "batch", "--allow-batch"),
             Commands::Session(args) => match args.action {
                 SessionAction::Gc(_) => {
-                    self.require(self.file_write, "session gc", "--allow-file-write")
+                    self.require(self.session_gc, "session gc", "--allow-session-gc")
                 }
                 _ => Ok(()),
             },
@@ -135,26 +146,47 @@ impl Restrictions {
                 "Omit cwd; the app starts in its own default directory.",
             ));
         }
-        let debug_switch = args.args.iter().any(|arg| is_debug_switch(arg));
-        if args.cdp.is_some() || debug_switch {
-            return self.require(
-                self.cdp,
-                "launch with a DevTools or inspector endpoint (cdp, --remote-debugging-*, --inspect*)",
-                "--allow-cdp",
-            );
+        if let Some(entry) = args
+            .env
+            .iter()
+            .find(|entry| is_program_search_env_key(env_key(entry)))
+        {
+            return Err(denied(
+                format!(
+                    "launch --env {} is not available to MCP clients: it decides which program or DLL the new process finds first",
+                    env_key(entry)
+                ),
+                "Omit that variable; the app starts with the server's own search path.",
+            ));
         }
-        Ok(())
+        if self.cdp {
+            return Ok(());
+        }
+        let texts = args
+            .args
+            .iter()
+            .map(String::as_str)
+            .chain(args.env.iter().map(String::as_str));
+        let opens_endpoint = args.cdp.is_some()
+            || args
+                .env
+                .iter()
+                .any(|entry| is_inspector_env_key(env_key(entry)))
+            || texts.into_iter().any(mentions_debug_endpoint);
+        self.require(
+            !opens_endpoint,
+            "launch with a DevTools or inspector endpoint (cdp, remote-debugging, inspect, marionette, NODE_OPTIONS, ELECTRON_*)",
+            "--allow-cdp",
+        )
     }
 
-    fn refuse_force(&self, force: bool, command: &str) -> Result<(), AppError> {
+    fn refuse_force(&self, force: bool, command: &str, reason: &str) -> Result<(), AppError> {
         if !force {
             return Ok(());
         }
         Err(denied(
-            format!(
-                "{command} --force is not available to MCP clients: it bypasses the blocked-shortcut list (win+r, alt+f4, ...)"
-            ),
-            "Send the combo without force; a person can run it from the CLI if it is really intended.",
+            format!("{command} --force is not available to MCP clients: {reason}"),
+            "Run it without force; a person can use the CLI if force is really intended.",
         ))
     }
 
@@ -204,50 +236,6 @@ fn denied(message: impl Into<String>, suggestion: impl Into<String>) -> AppError
         .with_suggestion(suggestion)
         .with_disposition(DeliverySemantics::not_delivered())
         .into()
-}
-
-fn is_debug_switch(argument: &str) -> bool {
-    let switch = argument.trim_start_matches(['-', '/']).to_ascii_lowercase();
-    DEBUG_SWITCH_PREFIXES
-        .iter()
-        .any(|prefix| switch.starts_with(prefix))
-}
-
-/// True when `path` is an absolute path strictly below `root`, with no `.` or `..` step, and, where it already
-/// exists, resolves below the resolved `root` too, so a junction or symlink inside `root` cannot lead out of it.
-fn is_inside(path: &Path, root: &Path) -> bool {
-    if !path.is_absolute() || !has_only_plain_steps(path) || !is_below(path, root) {
-        return false;
-    }
-    let Ok(resolved_root) = root.canonicalize() else {
-        return true;
-    };
-    let Some(existing) = path.ancestors().find(|ancestor| ancestor.exists()) else {
-        return true;
-    };
-    existing
-        .canonicalize()
-        .is_ok_and(|resolved| is_below(&resolved, &resolved_root) || resolved == resolved_root)
-}
-
-fn has_only_plain_steps(path: &Path) -> bool {
-    !path
-        .components()
-        .any(|part| matches!(part, Component::ParentDir | Component::CurDir))
-}
-
-fn is_below(path: &Path, root: &Path) -> bool {
-    let fold = |part: Component| {
-        let text = part.as_os_str().to_string_lossy().into_owned();
-        if cfg!(windows) {
-            text.to_ascii_lowercase()
-        } else {
-            text
-        }
-    };
-    let path = path.components().map(fold).collect::<Vec<_>>();
-    let root = root.components().map(fold).collect::<Vec<_>>();
-    path.len() > root.len() && path[..root.len()] == root[..]
 }
 
 #[cfg(test)]

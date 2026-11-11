@@ -57,7 +57,7 @@ fn launch_batch_and_session_gc_are_not_listed_until_their_opt_in() {
 }
 
 #[test]
-fn force_never_reaches_the_schema_or_the_argv_of_any_key_tool() {
+fn force_never_reaches_the_schema_or_the_argv_of_any_key_or_close_tool() {
     for path in [["press"], ["key-down"], ["key-up"]] {
         let tool = tool_at(&Restrictions::all_allowed(), &path).expect("tool");
         assert!(
@@ -72,8 +72,9 @@ fn force_never_reaches_the_schema_or_the_argv_of_any_key_tool() {
             .expect_err("force is not an argument");
         assert!(error.contains("Unknown argument 'force'"), "{error}");
     }
-    let close_app = tool_at(&Restrictions::default(), &["close-app"]).expect("close-app");
-    assert!(properties(&close_app).contains(&"force".to_string()));
+    let close_app = tool_at(&Restrictions::all_allowed(), &["close-app"]).expect("close-app");
+    assert!(!properties(&close_app).contains(&"force".to_string()));
+    assert!(properties(&close_app).contains(&"app".to_string()));
 }
 
 #[test]

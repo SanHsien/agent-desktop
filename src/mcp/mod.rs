@@ -3,6 +3,7 @@
 mod call;
 mod calls;
 mod catalog;
+mod confinement;
 mod exposure;
 pub(crate) mod restrictions;
 mod startup;
@@ -50,7 +51,10 @@ pub(crate) fn command() -> Command {
 /// Serves MCP over stdin and stdout until stdin closes, then finishes the tool calls already running.
 /// At most `MAX_CONCURRENT_CALLS` calls run at once, and a message longer than `MAX_MESSAGE_BYTES` is refused unread.
 pub(crate) fn serve(matches: &ArgMatches) -> ExitCode {
-    let limits = match startup::restrictions(matches) {
+    let limits = match startup::restrictions(matches).and_then(|limits| {
+        startup::create_output_root(&limits)?;
+        Ok(limits)
+    }) {
         Ok(limits) => limits,
         Err(message) => {
             eprintln!("agent-desktop mcp: {message}");

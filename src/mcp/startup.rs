@@ -8,9 +8,10 @@ use super::restrictions::Restrictions;
 const ALLOW_LAUNCH: &str = "allow-launch";
 const ALLOW_BATCH: &str = "allow-batch";
 const ALLOW_FILE_WRITE: &str = "allow-file-write";
+const ALLOW_SESSION_GC: &str = "allow-session-gc";
 const ALLOW_CDP: &str = "allow-cdp";
 
-pub(crate) fn flags() -> [Arg; 4] {
+pub(crate) fn flags() -> [Arg; 5] {
     let flag = |name: &'static str, help: &'static str| {
         Arg::new(name)
             .long(name)
@@ -28,7 +29,11 @@ pub(crate) fn flags() -> [Arg; 4] {
         ),
         flag(
             ALLOW_FILE_WRITE,
-            "Let tools read and write files, only inside <session dir>/mcp-output; needs --session; also exposes session gc",
+            "Let tools read and write files, only inside <session dir>/mcp-output (created at startup); needs --session",
+        ),
+        flag(
+            ALLOW_SESSION_GC,
+            "Expose session gc, which deletes ended or stale sessions anywhere under the state directory, not only this server's output",
         ),
         flag(
             ALLOW_CDP,
@@ -44,6 +49,7 @@ pub(crate) fn restrictions(matches: &ArgMatches) -> Result<Restrictions, String>
         launch: on(ALLOW_LAUNCH),
         batch: on(ALLOW_BATCH),
         file_write: on(ALLOW_FILE_WRITE),
+        session_gc: on(ALLOW_SESSION_GC),
         cdp: on(ALLOW_CDP),
         file_root: None,
     };
@@ -60,6 +66,15 @@ pub(crate) fn restrictions(matches: &ArgMatches) -> Result<Restrictions, String>
         limits.file_root = Some(Restrictions::output_root(&dir));
     }
     Ok(limits)
+}
+
+/// Creates the output directory file arguments must stay inside, so the child can resolve it before any file exists.
+pub(crate) fn create_output_root(limits: &Restrictions) -> Result<(), String> {
+    let Some(root) = limits.file_root.as_deref() else {
+        return Ok(());
+    };
+    std::fs::create_dir_all(root)
+        .map_err(|error| format!("cannot create {}: {error}", root.display()))
 }
 
 #[cfg(test)]

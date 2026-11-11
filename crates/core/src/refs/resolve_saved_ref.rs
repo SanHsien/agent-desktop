@@ -48,15 +48,46 @@ pub fn resolve_saved_ref(
 
 /// A handle that landed a saved ref without the whole-window uniqueness count.
 ///
-/// It converts to nothing: no `Deref`, no `From`, no way to take the
-/// [`NativeHandle`] out. A dispatch is handed the handle of a full
-/// [`resolve_saved_ref`], which is a plain `NativeHandle`, so the compiler
-/// rejects a provisional landing in a dispatch position. The only door is
-/// [`ProvisionalHandle::for_reads`], for actionability reads and presentation.
-pub(crate) struct ProvisionalHandle(NativeHandle);
+/// It is not a [`NativeHandle`] and converts to none: no `Deref`, no `From`, no way to take the handle out. The
+/// one door is [`ProvisionalHandle::for_reads`], used for actionability reads and presentation. What the type
+/// enforces is that a provisional landing cannot be passed where a `NativeHandle` is expected without that
+/// explicit call. It does not stop a caller from handing the result of `for_reads` to a dispatch: the check that
+/// no dispatch does so is that `dispatch_resolved_landing` takes its handle from a full [`resolve_saved_ref`],
+/// and nothing in `ref_action` calls `for_reads` on the way to `execute_verified_action`.
+///
+/// Reading through the door compiles:
+///
+/// ```
+/// use agent_desktop_core::{NativeHandle, refs::resolve_saved_ref::ProvisionalHandle};
+/// fn read(_: &NativeHandle) {}
+/// fn demo(landed: &ProvisionalHandle) {
+///     read(landed.for_reads());
+/// }
+/// ```
+///
+/// Passing the provisional handle itself where a `NativeHandle` is expected does not, so it has no `Deref`:
+///
+/// ```compile_fail
+/// use agent_desktop_core::{NativeHandle, refs::resolve_saved_ref::ProvisionalHandle};
+/// fn dispatch(_: &NativeHandle) {}
+/// fn demo(landed: &ProvisionalHandle) {
+///     dispatch(landed);
+/// }
+/// ```
+///
+/// Nor does converting it, so it has no `From` or `Into`:
+///
+/// ```compile_fail
+/// use agent_desktop_core::{NativeHandle, refs::resolve_saved_ref::ProvisionalHandle};
+/// fn demo(landed: ProvisionalHandle) -> NativeHandle {
+///     landed.into()
+/// }
+/// ```
+pub struct ProvisionalHandle(NativeHandle);
 
 impl ProvisionalHandle {
-    pub(crate) fn for_reads(&self) -> &NativeHandle {
+    /// The landed handle, for reads that never act on the element.
+    pub fn for_reads(&self) -> &NativeHandle {
         &self.0
     }
 }

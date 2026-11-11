@@ -85,6 +85,8 @@ Git 產品差異清單 + 表格
 | `src/mcp/call.rs` | 子行程啟動時帶入 `ChildSetup`（全域旗標加上 MCP 限制的環境變數），取代單純的 `globals`（函式參數不得超過 5 個） | 上游 MCP 伺服器把限制傳給子行程，或取回上游版本 |
 | `src/mcp/catalog.rs` | 工具清單與 schema 依 `Restrictions` 過濾（隱藏 launch、batch、session gc、`force`、`cwd`、未開啟的檔案與 cdp 參數）；相對檔案路徑改寫到 session 輸出目錄；trace export 預設輸出路徑落在該目錄 | 上游 MCP 目錄自行過濾危險工具與參數，或取回上游版本 |
 | `src/mcp/catalog_tests.rs` | 測試輔助 `tools()` 改為全開限制；新增「每個路徑型參數都有檔案限制或不提供」與「預設目錄不含 launch、batch、session gc」測試 | 隨 `src/mcp/catalog.rs` 取回上游而移除 |
+| `src/mcp/confinement.rs` | 新檔：MCP 限制的路徑與參數檢查——輸出目錄內判定（輸出目錄不存在或無法解析即拒絕、拒絕保留裝置名與尾端點或空白與串流）、launch 環境變數（inspector 類與 PATH 類）與 debug 端點的子字串掃描，見 ADR-011 的推送前審查修正 | 隨 `src/mcp/restrictions.rs` 取回上游或上游自帶等效檢查而移除 |
+| `src/mcp/confinement_tests.rs` | 新檔：confinement 的測試，含環境變數、嵌入式開關、PATH 類變數、close-app force、裝置名與不存在的輸出目錄 | 隨 `src/mcp/confinement.rs` 移除 |
 | `src/mcp/exposure.rs` | 新檔：決定哪些工具與參數在某組限制下公開、哪些參數是檔案路徑、相對路徑如何改寫（`catalog.rs` 已接近 400 行） | 隨 `src/mcp/catalog.rs` 取回上游而移除 |
 | `src/mcp/exposure_tests.rs` | 新檔：公開範圍與路徑改寫測試 | 隨 `src/mcp/exposure.rs` 移除 |
 | `src/mcp/mod.rs` | `mcp` 子命令加四個 `--allow-*` 旗標；`serve` 解析限制並傳給子行程，session 不存在時拒絕 `--allow-file-write`；INSTRUCTIONS 說明預設關閉與「不是沙盒」；`Server` 改持有 `ChildSetup` | 上游 MCP 伺服器提供等效旗標與說明，或取回上游版本 |
