@@ -5,13 +5,23 @@ use super::{
 };
 use crate::system::launch_path::resolve_executable;
 use agent_desktop_core::{Deadline, DeliveryDisposition, ErrorCode};
-use std::sync::Mutex;
+use std::sync::{Mutex, MutexGuard};
 
 static NOTEPAD_LAUNCH_LOCK: Mutex<()> = Mutex::new(());
 
+/// Serializes the tests that start windowed probes. A test that panics while
+/// holding the lock poisons it; taking the guard anyway keeps that one failure
+/// from turning every other test in the group into a `PoisonError` that hides
+/// which test actually broke.
+fn notepad_launch_lock() -> MutexGuard<'static, ()> {
+    NOTEPAD_LAUNCH_LOCK
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+}
+
 #[test]
 fn scratch_launch_returns_window_for_created_process() {
-    let _lock = NOTEPAD_LAUNCH_LOCK.lock().expect("notepad lock");
+    let _lock = notepad_launch_lock();
     crate::tree::fixture::bootstrap();
     let dir = scratch_dir("notepad-scratch");
     let probe = copy_probe_binary(&dir, "launchprobe_host_scratch.exe");
@@ -33,7 +43,7 @@ fn scratch_launch_returns_window_for_created_process() {
 
 #[test]
 fn attach_true_reuses_single_running_instance() {
-    let _lock = NOTEPAD_LAUNCH_LOCK.lock().expect("notepad lock");
+    let _lock = notepad_launch_lock();
     crate::tree::fixture::bootstrap();
     let dir = scratch_dir("notepad-attach");
     let probe = copy_probe_binary(&dir, "launchprobe_host_attach.exe");
@@ -58,7 +68,7 @@ fn attach_true_reuses_single_running_instance() {
 
 #[test]
 fn attach_true_does_not_reuse_same_basename_from_another_path() {
-    let _lock = NOTEPAD_LAUNCH_LOCK.lock().expect("notepad lock");
+    let _lock = notepad_launch_lock();
     crate::tree::fixture::bootstrap();
     let dir = scratch_dir("same-basename");
     let intended_dir = dir.join("intended");
@@ -94,7 +104,7 @@ fn attach_true_does_not_reuse_same_basename_from_another_path() {
 
 #[test]
 fn attach_false_fails_naming_running_pid() {
-    let _lock = NOTEPAD_LAUNCH_LOCK.lock().expect("notepad lock");
+    let _lock = notepad_launch_lock();
     crate::tree::fixture::bootstrap();
     let dir = scratch_dir("notepad-noattach");
     let probe = copy_probe_binary(&dir, "launchprobe_host_noattach.exe");
@@ -159,7 +169,7 @@ fn attach_true_windowless_does_not_launch_second_process() {
 
 #[test]
 fn two_matches_are_ambiguous_before_launch() {
-    let _lock = NOTEPAD_LAUNCH_LOCK.lock().expect("notepad lock");
+    let _lock = notepad_launch_lock();
     crate::tree::fixture::bootstrap();
     let dir = scratch_dir("notepad-ambiguous");
     let probe = copy_probe_binary(&dir, "launchprobe_host_ambiguous.exe");
@@ -260,52 +270,83 @@ fn timeout_zero_checks_once_for_process_without_window() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
-/// The hijack scenario itself needs the literal bare name `notepad.exe`,
-/// since it is bare-name resolution against the real system directories that
-/// is under test; a uniquely-named probe copy would not exercise it. What it
-/// does not need is to hold the process-wide current directory across the
-/// launch that follows. Resolution is captured once, under the planted cwd,
-/// and the cwd is restored immediately after — before the up-to-8-second
-/// window poll runs, and before the already-resolved absolute path is handed
-/// to the launch so nothing downstream depends on cwd being anything at all.
+/// Resolves `name` with the process current directory set to `plant_dir`, then
+/// puts the directory back before returning, so no caller holds a changed cwd
+/// across anything slow.
+fn resolve_under_planted_cwd(name: &str, plant_dir: &std::path::Path) -> std::path::PathBuf {
+    let previous = std::env::current_dir().expect("cwd");
+    std::env::set_current_dir(plant_dir).expect("enter plant dir");
+    let resolved = resolve_executable(name);
+    let _ = std::env::set_current_dir(&previous);
+    resolved.expect("resolve ignores cwd")
+}
+
+/// A bare executable name must resolve to the system directories, never to a
+/// same-named file sitting in the current directory. The hijack needs the
+/// literal bare name, since bare-name resolution against the real system
+/// directories is what is under test; a uniquely-named probe copy would not
+/// exercise it. Resolution is captured once under the planted cwd and the cwd
+/// is restored immediately, before the already-resolved absolute path is
+/// launched, so nothing downstream depends on cwd being anything at all.
+///
+/// The launched process is `ping.exe`, not `notepad.exe`. What a launch of the
+/// OS-supplied Notepad does differs per Windows build: some builds forward to
+/// the Store app and exit at once (the window then belongs to another pid),
+/// one build crashed on startup, and a Notepad the developer already has open
+/// makes `attach_if_running: false` refuse the launch. A windowless console
+/// tool has none of that, and the property under test is which image runs, not
+/// that a window appears. Resolving `notepad.exe` is still checked, since that
+/// needs no process.
 #[test]
 fn bare_name_never_chooses_planted_binary_in_current_directory() {
-    let _lock = NOTEPAD_LAUNCH_LOCK.lock().expect("notepad lock");
-    crate::tree::fixture::bootstrap();
-    let system_notepad = resolve_executable("notepad.exe").expect("system notepad");
     let plant_dir = scratch_dir("hijack");
-    let planted = plant_dir.join("notepad.exe");
-    std::fs::write(&planted, b"not a real pe").expect("plant decoy");
-    let previous = std::env::current_dir().expect("cwd");
-    std::env::set_current_dir(&plant_dir).expect("enter plant dir");
-    let resolved = resolve_executable("notepad.exe");
-    let _ = std::env::set_current_dir(&previous);
-    let resolved = resolved.expect("resolve ignores cwd");
-    assert_ne!(
-        resolved.canonicalize().ok(),
-        planted.canonicalize().ok(),
-        "resolver must not select the planted cwd binary"
-    );
-    assert_eq!(
-        resolved.canonicalize().ok(),
-        system_notepad.canonicalize().ok()
-    );
-    let window = launch_app_impl(
+    for name in ["notepad.exe", "ping.exe"] {
+        let planted = plant_dir.join(name);
+        std::fs::write(&planted, b"not a real pe").expect("plant decoy");
+        let system = resolve_executable(name).expect("system executable");
+        let resolved = resolve_under_planted_cwd(name, &plant_dir);
+        assert_ne!(
+            resolved.canonicalize().ok(),
+            planted.canonicalize().ok(),
+            "resolver must not select the planted cwd binary for {name}"
+        );
+        assert_eq!(
+            resolved.canonicalize().ok(),
+            system.canonicalize().ok(),
+            "the bare name {name} must resolve to the same system binary with or without a planted cwd"
+        );
+    }
+
+    let resolved = resolve_under_planted_cwd("ping.exe", &plant_dir);
+    let result = launch_app_impl(
         resolved.to_str().expect("utf8 path"),
-        &probe_launch_options(false, 8_000),
+        &LaunchOptions {
+            args: vec!["-n".into(), "30".into(), "127.0.0.1".into()],
+            attach_if_running: false,
+            timeout_ms: 0,
+            ..Default::default()
+        },
         deadline(10_000),
     )
-    .expect("launch system notepad");
-    let _guard = KillOnDrop(window.pid);
-    let image = full_image_path(window.pid).expect("image path");
+    .expect("launch system ping (no other ping.exe may be running)");
+    let _guard = KillOnDrop(result.pid);
+    let image = full_image_path(result.pid).expect("image path of the launched process");
     let image_canon = image.canonicalize().unwrap_or(image);
-    let planted_canon = planted.canonicalize().unwrap_or(planted.clone());
+    let planted_canon = plant_dir
+        .join("ping.exe")
+        .canonicalize()
+        .expect("planted decoy");
     assert_ne!(image_canon, planted_canon);
     assert_eq!(
         image_canon
             .file_name()
             .map(|name| name.to_ascii_lowercase()),
-        Some(std::ffi::OsString::from("notepad.exe"))
+        Some(std::ffi::OsString::from("ping.exe"))
+    );
+    assert_eq!(
+        image_canon.canonicalize().ok(),
+        resolved.canonicalize().ok(),
+        "the process that ran must be the resolved system binary"
     );
     let _ = std::fs::remove_dir_all(&plant_dir);
 }

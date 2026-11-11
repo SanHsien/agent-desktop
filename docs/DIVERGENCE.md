@@ -47,6 +47,7 @@ Git 產品差異清單 + 表格
 | `crates/windows/src/system/interaction_lease/directory_tests.rs` | 缺少 SeRestorePrivilege 時跳過異主目錄測試，並忽略部分清理錯誤；這會減少該環境的測試覆蓋 | 上游 fixture 可在無特權環境驗證拒絕行為，或保留可稽核的跳過理由及清理方式 |
 | `crates/windows/src/system/interaction_lease/tests.rs` | lease scratch 目錄明設私有 ACL，避免繼承權限干擾 | 上游 scratch 目錄在 Windows 原生環境通過 lease 私有目錄測試 |
 | `crates/windows/src/system/launch_lease_isolation_tests.rs` | 子程序環境傾印明確使用 cmd /U 與嚴格 UTF-16LE 解碼，並驗證非 ASCII 值，避免將本機碼頁誤當 UTF-8 | 上游具備與碼頁無關的子程序 lease key 隔離測試，且在碼頁 950 與 65001 通過 |
+| `crates/windows/src/system/launch_live_tests.rs` | `bare_name_never_chooses_planted_binary_in_current_directory` 不再啟動系統 Notepad（改啟動 `ping.exe -n 30 127.0.0.1`，解析檢查對 `notepad.exe` 與 `ping.exe` 都保留）；live 測試的鎖改用 `notepad_launch_lock()`，鎖被毒化時仍取得 guard。成因：當日 Notepad 啟動即崩潰，以及已開著 Notepad 時 `attach_if_running: false` 必拒，見 ADR-009 | 上游 launch live 測試不依賴系統 Notepad 的存活，且單一測試 panic 不會讓同群測試連帶 `PoisonError` |
 | `crates/windows/src/system/private_file/dacl.rs` | 驗證既有 ACL 時接受 Owner Rights 與 Creator Owner SID；建立時的授權集合不變 | 上游涵蓋這兩種 SID 並仍拒絕其他主體，私有檔案 ACL 測試通過 |
 | `crates/windows/src/system/private_file/tests.rs` | private-file scratch 目錄明設 ACL，包含 Owner Rights 與目前使用者 | 上游 fixture 可建立與驗證相同安全邊界的私有目錄 |
 | `crates/windows/src/system/runtime/mod.rs` | 新增輸入桌面附掛 helper；OpenInputDesktop 或 SetThreadDesktop 失敗不回報給呼叫端 | 上游提供等效桌面處理並通過隔離桌面測試，再移除本地 helper 及其使用點 |
