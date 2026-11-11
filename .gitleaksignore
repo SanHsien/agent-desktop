@@ -4,3 +4,10 @@
 # remove them or exempt later commits or other privacy findings.
 483a31d036175f54c34ce1fbd2cea762560ab78c:docs/plans/2026-08-16-001-feat-windows-2-12-fixture-e2e-harness-plan.md:ad-windows-account-sid:68
 483a31d036175f54c34ce1fbd2cea762560ab78c:docs/plans/2026-08-16-001-feat-windows-2-12-fixture-e2e-harness-plan.md:ad-windows-account-sid:167
+
+# Exact historical finding in an MCP restriction test: the Windows
+# shared-profile folder named Public (not an operator account) was used as a
+# sample --cwd value. 0f95885b replaced it with C:\ProgramData,
+# so it is absent from the current tree. This acknowledges only that one line
+# in d19df203; the same pattern in any other commit or file still fails.
+d19df20343edd16f79f4c341decaff73f3f8a274:src/mcp/restrictions_tests.rs:ad-home-directory-path:125
