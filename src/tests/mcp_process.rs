@@ -114,3 +114,84 @@ fn malformed_messages_get_errors_and_the_server_keeps_serving() {
     );
     assert_eq!(responses[4]["result"]["isError"], false);
 }
+
+fn listed_tools(args: &[&str]) -> Vec<String> {
+    let responses = serve(
+        &[json!({ "jsonrpc": "2.0", "id": 1, "method": "tools/list" })],
+        args,
+    );
+    responses[0]["result"]["tools"]
+        .as_array()
+        .expect("tools")
+        .iter()
+        .map(|tool| tool["name"].as_str().expect("name").to_string())
+        .collect()
+}
+
+#[test]
+fn mcp_server_hides_launch_batch_and_session_gc_until_each_is_allowed() {
+    let default = listed_tools(&[]);
+    for name in ["desktop_launch", "desktop_batch", "desktop_session_gc"] {
+        assert!(!default.iter().any(|tool| tool == name), "{name}");
+    }
+    assert!(default.iter().any(|tool| tool == "desktop_snapshot"));
+    let opted_in = listed_tools(&["--allow-launch", "--allow-batch"]);
+    assert!(opted_in.iter().any(|tool| tool == "desktop_launch"));
+    assert!(opted_in.iter().any(|tool| tool == "desktop_batch"));
+    assert!(!opted_in.iter().any(|tool| tool == "desktop_session_gc"));
+}
+
+#[test]
+fn mcp_server_refuses_force_and_unlisted_tools_before_anything_runs() {
+    let responses = serve(
+        &[
+            call(
+                1,
+                "desktop_press",
+                json!({ "combo": "win+r", "force": true }),
+            ),
+            call(2, "desktop_batch", json!({ "commands_json": "[]" })),
+            call(3, "desktop_launch", json!({ "app": "notepad" })),
+        ],
+        &[],
+    );
+    let force = &responses[0]["result"];
+    assert_eq!(force["isError"], true, "{force}");
+    assert!(
+        force["content"][0]["text"]
+            .as_str()
+            .is_some_and(|text| text.contains("Unknown argument 'force'")),
+        "{force}"
+    );
+    assert_eq!(responses[1]["error"]["code"], -32602, "{responses:?}");
+    assert_eq!(responses[2]["error"]["code"], -32602, "{responses:?}");
+}
+
+#[test]
+fn a_child_started_by_the_server_refuses_commands_outside_its_limits() {
+    let run = |allow: &str| {
+        let output = binary()
+            .args(["batch", "[]"])
+            .env("AGENT_DESKTOP_MCP_ALLOW", allow)
+            .output()
+            .expect("binary runs");
+        serde_json::from_slice::<Value>(&output.stdout).expect("one JSON envelope")
+    };
+    let refused = run("");
+    assert_eq!(refused["ok"], false, "{refused}");
+    assert_eq!(refused["error"]["code"], "POLICY_DENIED", "{refused}");
+    let allowed = run("batch");
+    assert_ne!(allowed["error"]["code"], "POLICY_DENIED", "{allowed}");
+}
+
+#[test]
+fn file_output_without_a_session_stops_the_server_instead_of_guessing_a_directory() {
+    let output = binary()
+        .args(["mcp", "--allow-file-write"])
+        .env_remove("AGENT_DESKTOP_SESSION")
+        .stdin(Stdio::null())
+        .output()
+        .expect("binary runs");
+    assert_eq!(output.status.code(), Some(2));
+    assert!(String::from_utf8_lossy(&output.stderr).contains("--session"));
+}

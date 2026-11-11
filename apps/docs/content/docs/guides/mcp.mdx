@@ -4,7 +4,7 @@ navTitle: MCP
 description: Serve every agent-desktop command as an MCP tool over stdio. How tools map to commands, how global flags apply, and what a tool returns.
 ---
 
-`agent-desktop mcp` runs a Model Context Protocol server over stdio. Every command is a tool, so an MCP client gets the same surface as the CLI with no separate setup.
+`agent-desktop mcp` runs a Model Context Protocol server over stdio. Every command is a tool, except the few that run programs or write files, which stay off until you turn them on (see [Security](#security)).
 
 ## Connect a client
 
@@ -33,7 +33,7 @@ Each tool is one command, named `desktop_` plus the command with hyphens as unde
 
 A tool's arguments are its command's arguments, with hyphens as underscores: `snapshot --app Finder -i` is `desktop_snapshot` with `{ "app": "Finder", "interactive_only": true }`. Positional arguments use their names too, such as `ref_id` for `click`. A null argument counts as omitted.
 
-The tool list is read from the CLI's own command definitions, so it always matches the installed binary.
+The tool list is read from the CLI's own command definitions, so it always matches the installed binary. Tools and arguments that an `--allow-*` flag controls are absent from the list until the flag is given.
 
 ## Apply global flags once
 
@@ -61,6 +61,19 @@ Call `desktop_skills_get` with `{ "name": "desktop" }` for the observe-act loop 
 
 The server adds nothing the CLI cannot already do. Tool arguments become CLI arguments without a shell. A value is always passed as a value, never as a flag. A tool cannot set global flags such as `--session` or `--headed`; only the server's own command line can.
 
-A tool still has the CLI's full reach: it can operate any app the accessibility tree exposes, and `desktop_launch` starts any program on `PATH` with any arguments. Treat the server like a shell for the signed-in user. Keep your client's confirmation on for actions, and remember that text read from the screen is untrusted input to the model.
+An MCP client acts with the signed-in user's rights. It is trusted like that user and is not sandboxed. The limits below keep a confused or prompt-injected model away from the commands that run arbitrary code, they do not make a hostile client safe. Keep your client's confirmation on for actions, and remember that text read from the screen is untrusted input to the model.
+
+These are off unless you start the server with the flag:
+
+| Flag | Turns on | Limit that stays on |
+|---|---|---|
+| `--allow-launch` | `desktop_launch`, which starts any program the user can run | `cwd` is never offered, because a working directory picks which DLLs the new process loads |
+| `--allow-batch` | `desktop_batch` | Each batch entry is checked against the same limits as a direct call |
+| `--allow-file-write` | File arguments (`screenshot` path, `trace export` out, `clipboard-get` out, `clipboard-set` image and file URLs, `cursor-overlay` images) and `desktop_session_gc` | Paths stay inside `<session dir>/mcp-output`; needs `--session` or `AGENT_DESKTOP_SESSION` |
+| `--allow-cdp` | `cdp`, `--remote-debugging-*` and `--inspect*` launch arguments | Needs `--allow-launch` to matter |
+
+Some limits have no flag. `press`, `key-down` and `key-up` never offer `force`, so the blocked-shortcut list (`win+r`, `alt+f4`, `win+l`, and the others) always applies, in a batch too. The server hands its limits to each command it runs, and the command refuses anything outside them before it acts, so a batch entry cannot reach what a tool call cannot. Relative file paths in a direct tool call land under the output directory; an absolute path, or any path in a batch entry, must already be inside it, with no `..` and no junction or symlink out.
+
+Separately from the MCP server, `launch` and its working directory refuse network paths (`\\server\share`, `\\?\UNC\...`) and device paths on Windows in every mode, because opening one sends the user's NetNTLM credentials to the remote host and can run a remote executable.
 
 The server runs at most 8 tool calls at once and answers more with a tool error. It refuses any message over 4 MiB. A `notifications/cancelled` stops the call and it gets no response. A call that has not started never starts. A running call gets `SIGTERM` first, so it releases any key or button it holds, and is killed if it is still running 3 seconds later; on Windows it is killed at once.

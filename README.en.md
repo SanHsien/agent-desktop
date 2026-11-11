@@ -159,6 +159,8 @@ The Windows surface and `launch` notes and the Linux X11 and Wayland notes are i
 
 `type`, `set-value`, and `clipboard-set` accept `--stdin` for piped text, which keeps it out of process arguments. Batch JSON text does appear in process arguments, so run secret steps as separate commands.
 
+An MCP client acts with the signed-in user's rights: it is trusted like that user and is not sandboxed. This fork keeps the tools that run arbitrary code or write files off by default. `launch`, `batch`, file output (paths stay inside `<session dir>/mcp-output`, and `session gc` comes with it) and DevTools or inspector launch arguments turn on with `agent-desktop mcp --allow-launch`, `--allow-batch`, `--allow-file-write` (needs `--session`) and `--allow-cdp`. `press`, `key-down` and `key-up` never offer `force`, so the blocked-shortcut list (`win+r`, `alt+f4`, ...) always holds, in a batch too, and `launch` has no `cwd` over MCP. On Windows, `launch` refuses network (UNC) and device paths in every mode. See [docs/fork/DECISIONS.md](docs/fork/DECISIONS.md) ADR-011.
+
 ## Language bindings
 
 Each release also ships `libagent_desktop_ffi` for macOS, Linux and Windows, so a program can call the tool in process instead of starting the CLI for each command. `agent-desktop skills get ffi` covers the entry points, memory ownership and threading rules.

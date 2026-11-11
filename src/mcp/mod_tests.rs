@@ -1,9 +1,10 @@
+use super::restrictions::Restrictions;
 use super::*;
 
 fn server() -> Server {
     Server {
-        tools: catalog::tools(),
-        globals: Vec::new(),
+        tools: catalog::tools(&Restrictions::default()),
+        setup: call::ChildSetup::default(),
         calls: calls::Calls::default(),
     }
 }
@@ -50,7 +51,7 @@ fn modern_tools_list_is_cacheable_and_complete() {
     assert_eq!(result["cacheScope"], "public");
     assert_eq!(
         result["tools"].as_array().unwrap().len(),
-        catalog::tools().len()
+        catalog::tools(&Restrictions::default()).len()
     );
 }
 
@@ -68,7 +69,7 @@ fn unknown_tools_are_protocol_errors() {
 
 #[test]
 fn instructions_name_only_tools_that_exist() {
-    let names = catalog::tools()
+    let names = catalog::tools(&Restrictions::default())
         .into_iter()
         .map(|tool| tool.name)
         .collect::<Vec<_>>();

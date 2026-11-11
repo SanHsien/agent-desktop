@@ -28,11 +28,11 @@ agent-desktop launch <APP> [--timeout MS] [--arg VALUE]... [--env KEY=VALUE]... 
     <tr><th>Flag or argument</th><th>Default</th><th>Meaning</th></tr>
   </thead>
   <tbody>
-    <tr><td><code>APP</code></td><td>required</td><td>Application name, bundle ID, or path. The accepted forms depend on the platform.</td></tr>
+    <tr><td><code>APP</code></td><td>required</td><td>Application name, bundle ID, or path. The accepted forms depend on the platform. Windows refuses network (UNC) and device paths with <code>INVALID_ARGS</code>.</td></tr>
     <tr><td><code>--timeout MS</code></td><td><code>30000</code></td><td>Upper bound for the whole launch.</td></tr>
     <tr><td><code>--arg VALUE</code></td><td>none</td><td>Command-line argument for the app. Repeatable, order preserved. Write <code>--arg=-x</code> for a value that starts with a hyphen.</td></tr>
     <tr><td><code>--env KEY=VALUE</code></td><td>none</td><td>Environment variable for the launched process. Repeatable. A repeated key is <code>INVALID_ARGS</code>.</td></tr>
-    <tr><td><code>--cwd PATH</code></td><td>none</td><td>Working directory for the launched process.</td></tr>
+    <tr><td><code>--cwd PATH</code></td><td>none</td><td>Working directory for the launched process. It decides which DLLs the new process loads first, so pass only a directory you trust. Windows refuses a network path here. MCP clients cannot set it.</td></tr>
     <tr><td><code>--no-attach</code></td><td>off</td><td>Start a fresh instance instead of attaching to a running one.</td></tr>
     <tr><td><code>--activate</code></td><td>off</td><td>Bring the app forward so it presents a window, and wait for one up to <code>--timeout</code>. This takes the foreground.</td></tr>
     <tr><td><code>--cdp [PORT]</code></td><td>off</td><td>Launch with a loopback-only Chrome DevTools Protocol endpoint and verify that it answers. Omit <code>PORT</code>, or pass <code>0</code>, to pick a free port.</td></tr>

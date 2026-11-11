@@ -28,6 +28,8 @@ Git 產品差異清單 + 表格
 
 | Path | Reason | Removal condition |
 | --- | --- | --- |
+| `apps/docs/content/docs/commands/app-window.mdx` | launch 的 `APP` 與 `--cwd` 說明加上：Windows 拒絕網路與裝置路徑、`--cwd` 只傳可信目錄（它決定新程序先載入哪份 DLL）、MCP 用戶端不能設 `cwd`，見 ADR-011 | 上游文件涵蓋同樣的警示，或本 fork 取回上游版本 |
+| `apps/docs/content/docs/guides/mcp.mdx` | Security 段改寫：MCP 用戶端等同使用者而非沙盒，列出 `--allow-launch`、`--allow-batch`、`--allow-file-write`、`--allow-cdp` 與永遠生效的限制（`force` 不提供、檔案路徑限制在 session 輸出目錄），見 ADR-011 | 上游 MCP 伺服器自帶等效預設關閉的限制與文件，或本 fork 取回上游版本 |
 | `apps/docs/pnpm-lock.yaml` | minimatch 10.2.6 升到 11.0.5、`@vercel/geistdocs` 底下的 glob 11.1.0 升到 14.0.4，以修 Dependabot 告警 #5（minimatch < 11.0.1 受影響），見 ADR-010 | 上游 `apps/docs` 的 lockfile 已解到 minimatch >= 11.0.1，且 glob 版本宣告 minimatch ^11 |
 | `apps/docs/pnpm-workspace.yaml` | `overrides` 加 `@vercel/geistdocs>glob: 14.0.4` 與 `minimatch: 11.0.5`（兩者必須一起，只升 minimatch 會讓 glob 11 的萬用字元靜默回空），見 ADR-010 | `@vercel/geistdocs` 自行依賴 glob >= 14 且 `@ts-morph/common` 宣告 minimatch >= 11.0.1，兩條 override 可刪 |
 | `crates/core/src/session/tree.rs` | 非 Unix session 根目錄也經 `ensure_private`，避免只保護 trace 子目錄 | 上游在建立 session 時同樣保護根目錄，Windows session 測試通過 |
@@ -66,6 +68,19 @@ Git 產品差異清單 + 表格
 | `crates/windows/src/tree/hit_test/envelope_tests.rs` | occluded headed auto-wait 測試預算由 80 改為 1000 ms，仍驗證 ACTION_FAILED 與 not_delivered | 上游在同類 Windows 負載下用原預算穩定驗證相同合約，或改用確定性同步 |
 | `crates/windows/src/tree/surface_inventory_tests.rs` | 無視窗程序 fixture 改找任何可讀 generation token 的程序，移除固定系統程序名稱限制 | 上游 fixture 不依賴特定程序名稱且仍驗證空 inventory |
 | `crates/windows/src/tree/walk/cache_tests.rs` | 測試接受 Batch 或 Skip，放寬原本只能 Batch 的斷言；此差異降低策略驗證強度 | 上游以可控制的 fixture 明確驗證 cache policy，或能證明兩種結果都符合測試前提 |
+| `src/command_policy/mod.rs` | `preflight` 開頭呼叫 `mcp::restrictions::enforce`：由 MCP 伺服器啟動的子行程在動作前拒絕 force、launch、batch、檔案路徑等超出限制的指令；batch 的每個項目走同一個 `preflight`，所以 batch 無法繞過 | 上游 MCP 伺服器在子行程端強制等效限制，或本 fork 取回上游版本 |
+| `src/mcp/call.rs` | 子行程啟動時帶入 `ChildSetup`（全域旗標加上 MCP 限制的環境變數），取代單純的 `globals`（函式參數不得超過 5 個） | 上游 MCP 伺服器把限制傳給子行程，或取回上游版本 |
+| `src/mcp/catalog.rs` | 工具清單與 schema 依 `Restrictions` 過濾（隱藏 launch、batch、session gc、`force`、`cwd`、未開啟的檔案與 cdp 參數）；相對檔案路徑改寫到 session 輸出目錄；trace export 預設輸出路徑落在該目錄 | 上游 MCP 目錄自行過濾危險工具與參數，或取回上游版本 |
+| `src/mcp/catalog_tests.rs` | 測試輔助 `tools()` 改為全開限制；新增「每個路徑型參數都有檔案限制或不提供」與「預設目錄不含 launch、batch、session gc」測試 | 隨 `src/mcp/catalog.rs` 取回上游而移除 |
+| `src/mcp/exposure.rs` | 新檔：決定哪些工具與參數在某組限制下公開、哪些參數是檔案路徑、相對路徑如何改寫（`catalog.rs` 已接近 400 行） | 隨 `src/mcp/catalog.rs` 取回上游而移除 |
+| `src/mcp/exposure_tests.rs` | 新檔：公開範圍與路徑改寫測試 | 隨 `src/mcp/exposure.rs` 移除 |
+| `src/mcp/mod.rs` | `mcp` 子命令加四個 `--allow-*` 旗標；`serve` 解析限制並傳給子行程，session 不存在時拒絕 `--allow-file-write`；INSTRUCTIONS 說明預設關閉與「不是沙盒」；`Server` 改持有 `ChildSetup` | 上游 MCP 伺服器提供等效旗標與說明，或取回上游版本 |
+| `src/mcp/mod_tests.rs` | 測試伺服器改用預設（全關）限制與 `ChildSetup` | 隨 `src/mcp/mod.rs` 取回上游而移除 |
+| `src/mcp/restrictions.rs` | 新檔：MCP 限制的資料模型、環境變數編解碼，與對 `Commands` 的檢查（force、launch、batch、session gc、檔案路徑、DevTools 與 inspector 參數）；路徑檢查含 `..`、UNC、junction 與 symlink 逃逸 | 上游以型別層限制 MCP 可達的指令並涵蓋相同拒絕，或取回上游版本 |
+| `src/mcp/restrictions_tests.rs` | 新檔：每項限制的測試，含 batch 項目、junction 逃逸與環境往返 | 隨 `src/mcp/restrictions.rs` 移除 |
+| `src/mcp/startup.rs` | 新檔：`mcp` 的 `--allow-*` 旗標定義與限制解析（`mod.rs` 的行數預算） | 隨 `src/mcp/mod.rs` 取回上游而移除 |
+| `src/mcp/startup_tests.rs` | 新檔：旗標與 session 輸出目錄解析測試 | 隨 `src/mcp/startup.rs` 移除 |
 | `src/tests/cli_batch_session_end_tests.rs` | 從 `cli_process.rs` 拆出 batch session-end 測試以符合 400 行限制 | 上游以符合 source rules 的佈局保留相同 session-end 覆蓋 |
 | `src/tests/cli_process.rs` | Windows CLI scratch 目錄明設私有 ACL；batch session-end 測試拆到相鄰模組並公開 helper | 上游提供可用的 Windows 隔離目錄，並保留 batch 測試覆蓋及 400 行限制 |
+| `src/tests/mcp_process.rs` | 新增行程層測試：預設清單不含 launch、batch、session gc；force 與未列出的工具在執行前被拒；子行程在受限環境下回 `POLICY_DENIED`；`--allow-file-write` 無 session 時結束 | 上游行程測試涵蓋同樣的預設關閉行為 |
 | `src/tests/screen_sample.rs` | 螢幕像素測試改用固定大小 `as_chunks`，對齊 clippy 要求 | 上游保持相同 BGR 像素比對語意，螢幕取樣測試與 clippy 通過 |

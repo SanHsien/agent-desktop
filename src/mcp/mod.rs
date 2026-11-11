@@ -3,6 +3,9 @@
 mod call;
 mod calls;
 mod catalog;
+mod exposure;
+pub(crate) mod restrictions;
+mod startup;
 
 use clap::{ArgAction, ArgMatches, Command, CommandFactory, parser::ValueSource};
 use serde_json::{Map, Value, json};
@@ -27,23 +30,39 @@ desktop_skills_get with name \"desktop\" first for the observe-act loop, and wit
 \"platform\" for what differs on this OS. The skills use CLI syntax: `agent-desktop snapshot \
 --app Finder` is desktop_snapshot with {\"app\": \"Finder\"}, and the input schema replaces \
 --help. Global flags (--session, --agent-id, --headed, --wait-for, --trace) are fixed \
-by how this server was started and cannot be passed per call. Refs such as @s8f3k2p9:e1 come from \
+by how this server was started and cannot be passed per call. The user who started this server \
+turns launch, batch, file output and DevTools endpoints on with --allow-* flags: a tool that is \
+not listed is off, and a client is trusted like the user, not sandboxed. Refs such as \
+@s8f3k2p9:e1 come from \
 desktop_snapshot and go stale when the UI changes: on STALE_REF or AMBIGUOUS_TARGET, snapshot \
 again. Repeat an action only when its disposition.retry is \"safe\".";
 
 /// The `mcp` subcommand; it lives outside `Commands` because it serves commands rather than being one.
 pub(crate) fn command() -> Command {
-    Command::new("mcp").about(
-        "Serve every command as an MCP tool over stdio; global flags given here apply to every call",
-    )
+    Command::new("mcp")
+        .about(
+            "Serve every command as an MCP tool over stdio; global flags given here apply to every call. \
+             launch, batch, file output and DevTools endpoints are off unless an --allow-* flag turns them on",
+        )
+        .args(startup::flags())
 }
 
 /// Serves MCP over stdin and stdout until stdin closes, then finishes the tool calls already running.
 /// At most `MAX_CONCURRENT_CALLS` calls run at once, and a message longer than `MAX_MESSAGE_BYTES` is refused unread.
 pub(crate) fn serve(matches: &ArgMatches) -> ExitCode {
+    let limits = match startup::restrictions(matches) {
+        Ok(limits) => limits,
+        Err(message) => {
+            eprintln!("agent-desktop mcp: {message}");
+            return ExitCode::from(2);
+        }
+    };
     let server = Arc::new(Server {
-        tools: catalog::tools(),
-        globals: forwarded_globals(matches),
+        tools: catalog::tools(&limits),
+        setup: call::ChildSetup {
+            globals: forwarded_globals(matches),
+            env: limits.to_env(),
+        },
         calls: calls::Calls::default(),
     });
     let out = Arc::new(Mutex::new(std::io::stdout()));
@@ -120,7 +139,7 @@ fn read_message(input: &mut impl BufRead) -> Option<Result<Vec<u8>, RpcError>> {
 
 struct Server {
     tools: Vec<catalog::Tool>,
-    globals: Vec<String>,
+    setup: call::ChildSetup,
     calls: calls::Calls,
 }
 
@@ -213,7 +232,7 @@ impl Server {
             Some(Value::Object(arguments)) => arguments.clone(),
             Some(_) => return Err(RpcError::new(-32602, "Tool arguments must be an object")),
         };
-        Ok(call::call(tool, &arguments, &self.globals, &self.calls, id))
+        Ok(call::call(tool, &arguments, &self.setup, &self.calls, id))
     }
 }
 

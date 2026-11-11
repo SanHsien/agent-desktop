@@ -4,6 +4,8 @@ use clap::{Arg, ArgAction, Command, CommandFactory};
 use serde_json::{Map, Value, json};
 use std::any::TypeId;
 
+use super::exposure;
+use super::restrictions::Restrictions;
 use crate::cli::Cli;
 
 const TOOL_PREFIX: &str = "desktop";
@@ -15,15 +17,16 @@ pub(crate) struct Tool {
     pub name: String,
     pub path: Vec<String>,
     command: Command,
+    limits: Restrictions,
 }
 
-/// Every leaf command of the CLI, in declaration order.
-pub(crate) fn tools() -> Vec<Tool> {
+/// Every leaf command of the CLI that `limits` leaves on, in declaration order.
+pub(crate) fn tools(limits: &Restrictions) -> Vec<Tool> {
     let mut root = Cli::command();
     root.build();
     let mut found = Vec::new();
     for sub in commands(&root) {
-        collect(sub, Vec::new(), &mut found);
+        collect(sub, Vec::new(), limits, &mut found);
     }
     found
 }
@@ -34,12 +37,15 @@ fn commands(parent: &Command) -> impl Iterator<Item = &Command> {
         .filter(|sub| sub.get_name() != CLAP_HELP_SUBCOMMAND)
 }
 
-fn collect(command: &Command, mut path: Vec<String>, found: &mut Vec<Tool>) {
+fn collect(command: &Command, mut path: Vec<String>, limits: &Restrictions, found: &mut Vec<Tool>) {
     path.push(command.get_name().to_string());
     if command.has_subcommands() {
         for sub in commands(command) {
-            collect(sub, path.clone(), found);
+            collect(sub, path.clone(), limits, found);
         }
+        return;
+    }
+    if !exposure::tool_exposed(&path, limits) {
         return;
     }
     let name = std::iter::once(TOOL_PREFIX)
@@ -51,6 +57,7 @@ fn collect(command: &Command, mut path: Vec<String>, found: &mut Vec<Tool>) {
         name,
         path,
         command: command.clone(),
+        limits: limits.clone(),
     });
 }
 
@@ -82,10 +89,22 @@ impl Tool {
                 .args()
                 .find(|arg| property_name(arg) == *key)
                 .ok_or_else(|| self.unknown_argument(key))?;
+            let value = self.rebased(key, value);
             if arg.is_positional() {
-                positionals.push((arg.get_index().unwrap_or(usize::MAX), scalars(key, value)?));
+                positionals.push((arg.get_index().unwrap_or(usize::MAX), scalars(key, &value)?));
             } else {
-                push_option(&mut argv, arg, key, value)?;
+                push_option(&mut argv, arg, key, &value)?;
+            }
+        }
+        if self.path == ["trace", "export"] && !argv.iter().any(|arg| arg.starts_with("--out=")) {
+            if let Some(root) = self
+                .limits
+                .file_root
+                .as_deref()
+                .filter(|_| self.limits.file_write)
+            {
+                let file = root.join(exposure::TRACE_EXPORT_FILE);
+                argv.push(format!("--out={}", file.to_string_lossy()));
             }
         }
         if !positionals.is_empty() {
@@ -96,9 +115,32 @@ impl Tool {
         Ok(argv)
     }
 
+    fn rebased(&self, key: &str, value: &Value) -> Value {
+        let Some(root) = self.limits.file_root.as_deref() else {
+            return value.clone();
+        };
+        if !exposure::is_path_argument(&self.path, key) {
+            return value.clone();
+        }
+        match value {
+            Value::String(text) => Value::from(exposure::rebase(root, text)),
+            Value::Array(items) => Value::Array(
+                items
+                    .iter()
+                    .map(|item| match item {
+                        Value::String(text) => Value::from(exposure::rebase(root, text)),
+                        other => other.clone(),
+                    })
+                    .collect(),
+            ),
+            other => other.clone(),
+        }
+    }
+
     fn args(&self) -> impl Iterator<Item = &Arg> {
         self.command.get_arguments().filter(|arg| {
-            !arg.is_global_set()
+            exposure::arg_exposed(&self.path, &property_name(arg), &self.limits)
+                && !arg.is_global_set()
                 && !arg.is_hide_set()
                 && arg.get_id().as_str() != "stdin"
                 && !matches!(

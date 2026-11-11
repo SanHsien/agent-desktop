@@ -9,12 +9,19 @@ use super::catalog::Tool;
 
 const CANCELLED: &str = "Cancelled";
 
+/// What every child process of the server inherits: the server's own global flags and the limits on its clients.
+#[derive(Default)]
+pub(crate) struct ChildSetup {
+    pub globals: Vec<String>,
+    pub env: Vec<(&'static str, String)>,
+}
+
 /// Runs `tool` with `arguments` for request `id`, prefixed by the server's own global flags, and returns a
 /// `CallToolResult`. A cancelled call returns early; the caller sends no response for it.
 pub(crate) fn call(
     tool: &Tool,
     arguments: &Map<String, Value>,
-    globals: &[String],
+    setup: &ChildSetup,
     calls: &Calls,
     id: &Value,
 ) -> Value {
@@ -28,7 +35,8 @@ pub(crate) fn call(
     };
     let mut command = Command::new(exe);
     command
-        .args(globals)
+        .envs(setup.env.iter().map(|(key, value)| (key, value)))
+        .args(&setup.globals)
         .args(&argv)
         .stdin(Stdio::null())
         .stdout(Stdio::piped())

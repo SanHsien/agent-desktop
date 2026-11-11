@@ -185,6 +185,8 @@ agent-desktop snapshot --app "記事本" -i
 
 `type`、`set-value`、`clipboard-set` 可加 `--stdin` 從標準輸入讀文字，避免機密出現在行程參數；批次 JSON 內的文字會出現在行程參數，機密步驟請分開執行。
 
+MCP client 等同簽入使用者本人，**不是沙盒**。本 fork 預設關閉會執行任意程式或寫檔的工具：`launch`、`batch`、檔案輸出（路徑限制在 `<session 目錄>/mcp-output`，`session gc` 一併開啟）與 DevTools／inspector 啟動參數，分別用 `agent-desktop mcp --allow-launch`、`--allow-batch`、`--allow-file-write`（需要 `--session`）、`--allow-cdp` 開啟。`press`、`key-down`、`key-up` 永遠不提供 `force`，所以危險組合封鎖（`win+r`、`alt+f4` 等）在 batch 內也一律生效；MCP 的 `launch` 沒有 `cwd`。Windows 的 `launch` 在所有模式都拒絕網路（UNC）與裝置路徑。理由見 [docs/fork/DECISIONS.md](docs/fork/DECISIONS.md) ADR-011。
+
 ---
 
 ## 🔌 語言綁定（Language Bindings / FFI）

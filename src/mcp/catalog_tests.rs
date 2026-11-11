@@ -2,6 +2,10 @@ use super::*;
 use clap::Parser;
 use clap::error::ErrorKind;
 
+fn tools() -> Vec<Tool> {
+    super::tools(&Restrictions::all_allowed())
+}
+
 fn sample(schema: &Value) -> Value {
     let item = if schema["type"] == "array" {
         &schema["items"]
@@ -185,4 +189,39 @@ fn stdin_input_is_not_exposed_to_mcp_calls() {
                 .contains("Unknown argument 'stdin'")
         );
     }
+}
+
+#[test]
+fn every_path_argument_is_either_confined_to_the_output_directory_or_not_offered() {
+    let mut seen = 0;
+    for tool in tools() {
+        for arg in tool.args() {
+            if arg.get_value_parser().type_id() != TypeId::of::<std::path::PathBuf>() {
+                continue;
+            }
+            let id = property_name(arg);
+            let confined = exposure::is_path_argument(&tool.path, &id);
+            let never_offered =
+                !exposure::arg_exposed(&tool.path, &id, &Restrictions::all_allowed());
+            assert!(
+                confined || never_offered,
+                "{} offers the path argument '{id}' with no file limit",
+                tool.name
+            );
+            seen += 1;
+        }
+    }
+    assert!(seen >= 5, "only {seen} path arguments were found");
+}
+
+#[test]
+fn the_default_catalog_lists_no_tool_that_runs_programs_or_writes_files() {
+    let names = super::tools(&Restrictions::default())
+        .into_iter()
+        .map(|tool| tool.name)
+        .collect::<Vec<_>>();
+    for hidden in ["desktop_launch", "desktop_batch", "desktop_session_gc"] {
+        assert!(!names.iter().any(|name| name == hidden), "{hidden}");
+    }
+    assert!(names.iter().any(|name| name == "desktop_snapshot"));
 }

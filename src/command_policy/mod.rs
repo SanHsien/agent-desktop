@@ -80,6 +80,7 @@ pub(crate) fn policy_for(cmd: &Commands) -> PermissionNeed {
 }
 
 pub(crate) fn preflight(cmd: &Commands, report: &PermissionReport) -> Result<(), AppError> {
+    crate::mcp::restrictions::enforce(cmd)?;
     validate_args(cmd)?;
     let permission = policy_for(cmd);
     if requires_accessibility(permission) && report.accessibility_denied() {
