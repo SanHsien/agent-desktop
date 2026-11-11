@@ -130,13 +130,13 @@ fn a_batch_entry_cannot_launch_unless_launch_is_allowed() {
 #[test]
 fn launch_cwd_is_refused_even_when_launch_is_allowed() {
     let everything = with_root(Restrictions::all_allowed());
-    let direct = command(&["launch", "notepad", "--cwd", r"C:\Users\Public"]);
+    let direct = command(&["launch", "notepad", "--cwd", r"C:\ProgramData"]);
     assert_eq!(
         denied_code(everything.check(&direct)),
         ErrorCode::PolicyDenied
     );
     let entry =
-        json!({ "command": "launch", "args": { "app": "notepad", "cwd": "C:\\Users\\Public" } });
+        json!({ "command": "launch", "args": { "app": "notepad", "cwd": "C:\\ProgramData" } });
     assert!(everything.check(&batch_entry(entry)).is_err());
 }
 
