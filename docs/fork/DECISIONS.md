@@ -208,3 +208,9 @@
   - **`session gc` 拆成獨立的 `--allow-session-gc`**。它刪除狀態目錄下已結束或過期的 session，範圍不限於 `mcp-output`，不該跟檔案輸出綁在一起。
   - **F6 的敘述修正**：原文「dispatch 被交付完整 resolve_saved_ref 的 handle，所以編譯器擋下」不精確。型別保證的只是「暫定 handle 不經明確的 `for_reads()` 就不能當 `NativeHandle` 用」；`for_reads()` 的結果仍可傳進 dispatch，防止它的是 `dispatch_resolved_landing` 的 handle 來自完整的 `resolve_saved_ref`，且 `ref_action` 內沒有任何路徑把 `for_reads()` 接到 `execute_verified_action`。`ProvisionalHandle` 現為公開型別，文件附一個通過的範例與兩個 `compile_fail` 範例（無 `Deref`、無 `From`），釘住型別層的部分。
   - **技能文件**：`commands-interaction.md` 的選擇表原本仍把 `--headed mouse-click --xy` 當 click 的後備，改成排除 twin 與 `AMBIGUOUS_TARGET`。
+- **第二輪複審的修正（2026-11-12）**：
+  - debug 標記補 `jdwp`、`agentlib`、`xrunjdwp`、`debug-port`、`debug-brk`；inspector 類環境變數補 `JAVA_TOOL_OPTIONS`、`_JAVA_OPTIONS`、`JDK_JAVA_OPTIONS`。
+  - MCP 限制下 `launch --env` 的變數名稱含任何非 ASCII 字元就直接拒絕（Windows 對非 ASCII 字母做大小寫折疊，例如不帶點的 ı 對應 `I`，`NODE_OPTıONS` 會繞過 ASCII 比對）；值不受限制。
+  - 保留裝置名：`COM`／`LPT` 後接任何一位以上的數字（含多位數與上標）都拒絕；原本只認單一位數。
+  - 程式搜尋與注入類環境變數擴充到 `PSMODULEPATH`、`PYTHONPATH`、`PYTHONSTARTUP`、`NODE_PATH`、`CLASSPATH`、`DOTNET_STARTUP_HOOKS`、`DOTNET_ADDITIONAL_DEPS`、`PERL5LIB`、`RUBYLIB`，與 `PATH` 同類、所有 opt-in 下都拒絕。
+  - 重申：`--allow-launch` 才是真正的信任決定，這些清單與標記都是縱深防禦；開啟後 client 可以啟動 `cmd`、`powershell` 或直譯器，自己設定任何變數。

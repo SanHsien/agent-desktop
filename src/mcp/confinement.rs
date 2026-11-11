@@ -4,15 +4,39 @@
 use std::ffi::OsStr;
 use std::path::{Component, Path};
 
-const DEBUG_MARKERS: [&str; 4] = [
+const DEBUG_MARKERS: [&str; 9] = [
     "remote-debugging",
     "remote-allow-origins",
     "inspect",
     "marionette",
+    "jdwp",
+    "agentlib",
+    "xrunjdwp",
+    "debug-port",
+    "debug-brk",
 ];
-const INSPECTOR_ENV_KEYS: [&str; 2] = ["NODE_OPTIONS", "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS"];
+const INSPECTOR_ENV_KEYS: [&str; 5] = [
+    "NODE_OPTIONS",
+    "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS",
+    "JAVA_TOOL_OPTIONS",
+    "_JAVA_OPTIONS",
+    "JDK_JAVA_OPTIONS",
+];
 const ELECTRON_ENV_PREFIX: &str = "ELECTRON_";
-const PROGRAM_SEARCH_ENV_KEYS: [&str; 3] = ["PATH", "PATHEXT", "COMSPEC"];
+const PROGRAM_SEARCH_ENV_KEYS: [&str; 12] = [
+    "PATH",
+    "PATHEXT",
+    "COMSPEC",
+    "PSMODULEPATH",
+    "PYTHONPATH",
+    "PYTHONSTARTUP",
+    "NODE_PATH",
+    "CLASSPATH",
+    "DOTNET_STARTUP_HOOKS",
+    "DOTNET_ADDITIONAL_DEPS",
+    "PERL5LIB",
+    "RUBYLIB",
+];
 const RESERVED_DEVICES: [&str; 6] = ["CON", "PRN", "AUX", "NUL", "CONIN$", "CONOUT$"];
 const NUMBERED_DEVICES: [&str; 2] = ["COM", "LPT"];
 const FORBIDDEN_NAME_CHARACTERS: [char; 7] = [':', '<', '>', '"', '|', '?', '*'];
@@ -36,9 +60,15 @@ pub(super) fn is_inspector_env_key(key: &str) -> bool {
     INSPECTOR_ENV_KEYS.contains(&upper.as_str()) || upper.starts_with(ELECTRON_ENV_PREFIX)
 }
 
-/// Variables that decide which executable or DLL a new process finds first.
+/// Variables that decide which executable, DLL or module a new process finds or loads first.
 pub(super) fn is_program_search_env_key(key: &str) -> bool {
     PROGRAM_SEARCH_ENV_KEYS.contains(&key.to_ascii_uppercase().as_str())
+}
+
+/// Windows folds the case of non-ASCII letters in variable names (a dotless i matches `I`), which no ASCII
+/// comparison above sees, so a name with any non-ASCII character is refused outright.
+pub(super) fn has_non_ascii_name(key: &str) -> bool {
+    !key.is_ascii()
 }
 
 /// True when `path` is an absolute path strictly below `root` that names only ordinary files and folders, with no
@@ -110,11 +140,12 @@ fn is_device_stem(upper: &str) -> bool {
         return true;
     }
     NUMBERED_DEVICES.iter().any(|device| {
-        let mut rest = upper.strip_prefix(device).unwrap_or_default().chars();
-        matches!(
-            (rest.next(), rest.next()),
-            (Some('0'..='9' | '\u{b9}' | '\u{b2}' | '\u{b3}'), None)
-        )
+        upper.strip_prefix(device).is_some_and(|rest| {
+            !rest.is_empty()
+                && rest
+                    .chars()
+                    .all(|digit| matches!(digit, '0'..='9' | '\u{b9}' | '\u{b2}' | '\u{b3}'))
+        })
     })
 }
 

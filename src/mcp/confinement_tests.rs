@@ -47,6 +47,9 @@ fn inspector_environment_variables_need_the_cdp_opt_in() {
         "Webview2_Additional_Browser_Arguments=--x",
         "ELECTRON_RUN_AS_NODE=1",
         "electron_enable_logging=1",
+        "JAVA_TOOL_OPTIONS=-agentlib:jdwp=transport=dt_socket,server=y,address=5005",
+        "_java_options=-Xmx1g",
+        "Jdk_Java_Options=-Xmx1g",
     ] {
         let env = format!("--env={entry}");
         let launch = command(&["launch", "app", &env]);
@@ -84,6 +87,18 @@ fn a_debug_switch_hidden_inside_a_longer_argument_or_an_env_value_is_found() {
             "--arg=-Command & { node --Inspect-Brk app.js }",
         ],
         vec!["launch", "firefox", "--arg=-marionette"],
+        vec![
+            "launch",
+            "java",
+            "--arg=-agentlib:jdwp=transport=dt_socket,server=y,address=5005",
+        ],
+        vec![
+            "launch",
+            "java",
+            "--arg=-Xrunjdwp:transport=dt_socket,address=5005",
+        ],
+        vec!["launch", "app", "--arg=--debug-port=9229"],
+        vec!["launch", "app", "--arg=--DEBUG-BRK"],
         vec!["launch", "app", "--env=OPTS=--remote-allow-origins=*"],
     ] {
         let launch = command(&args);
@@ -108,6 +123,15 @@ fn program_search_variables_are_refused_even_with_every_opt_in() {
         "path=C:\\evil",
         "PathExt=.EXE",
         "COMSPEC=C:\\evil.exe",
+        "PSModulePath=C:\\evil",
+        "pythonpath=C:\\evil",
+        "PYTHONSTARTUP=C:\\evil.py",
+        "Node_Path=C:\\evil",
+        "CLASSPATH=C:\\evil",
+        "DOTNET_STARTUP_HOOKS=C:\\evil.dll",
+        "dotnet_additional_deps=C:\\evil",
+        "PERL5LIB=C:\\evil",
+        "RubyLib=C:\\evil",
     ] {
         let env = format!("--env={entry}");
         let launch = command(&["launch", "app", &env]);
@@ -125,6 +149,29 @@ fn program_search_variables_are_refused_even_with_every_opt_in() {
     )
     .expect("the entry decodes");
     assert!(everything.check(&batch).is_err());
+}
+
+#[test]
+fn a_variable_name_with_a_non_ascii_letter_is_refused_even_with_every_opt_in() {
+    let everything = Restrictions::all_allowed();
+    for entry in [
+        "NODE_OPT\u{131}ONS=--inspect=9229",
+        "P\u{c0}TH=C:\\evil",
+        "caf\u{e9}=1",
+    ] {
+        let env = format!("--env={entry}");
+        let launch = command(&["launch", "app", &env]);
+        assert_eq!(
+            denied_code(everything.check(&launch)),
+            ErrorCode::PolicyDenied,
+            "{entry}"
+        );
+    }
+    let ascii = command(&["launch", "app", "--env=CAFE=caf\u{e9}"]);
+    assert!(
+        everything.check(&ascii).is_ok(),
+        "a non-ASCII value is fine"
+    );
 }
 
 #[test]
@@ -159,6 +206,11 @@ fn reserved_device_names_and_stream_tricks_are_not_files_in_the_output_directory
         "COM\u{b9}",
         "LPT\u{b2}.png",
         "LPT0",
+        "COM10",
+        "com123.txt",
+        "LPT12.png",
+        "COM\u{b9}0",
+        "COM\u{b2}\u{b3}",
         "NUL.png",
         "nul",
         "CON",
@@ -179,7 +231,9 @@ fn reserved_device_names_and_stream_tricks_are_not_files_in_the_output_directory
     for name in [
         "shot.png",
         "console.png",
-        "com10.png",
+        "com.png",
+        "comet.png",
+        "lptx",
         "nul2",
         "auxiliary.txt",
         "a.b.c",

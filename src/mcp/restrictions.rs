@@ -7,7 +7,8 @@ use agent_desktop_core::{AdapterError, AppError, DeliverySemantics, ErrorCode};
 use std::path::{Path, PathBuf};
 
 use super::confinement::{
-    env_key, is_inside, is_inspector_env_key, is_program_search_env_key, mentions_debug_endpoint,
+    env_key, has_non_ascii_name, is_inside, is_inspector_env_key, is_program_search_env_key,
+    mentions_debug_endpoint,
 };
 use crate::cli::Commands;
 use crate::cli_args::{
@@ -144,6 +145,19 @@ impl Restrictions {
             return Err(denied(
                 "launch --cwd is not available to MCP clients: the working directory picks which DLLs the new process loads",
                 "Omit cwd; the app starts in its own default directory.",
+            ));
+        }
+        if let Some(entry) = args
+            .env
+            .iter()
+            .find(|entry| has_non_ascii_name(env_key(entry)))
+        {
+            return Err(denied(
+                format!(
+                    "launch --env {} is not available to MCP clients: variable names must be ASCII, because Windows folds the case of other letters",
+                    env_key(entry)
+                ),
+                "Use an ASCII variable name.",
             ));
         }
         if let Some(entry) = args
