@@ -73,7 +73,11 @@ observation, actions and capture there fail or return nothing.
   `delivered_unverified`.
 - **`launch` takes an absolute path or a bare name** under System32 or the
   Windows directory, with or without `.exe` (`notepad` or `notepad.exe`), not
-  a display name. Use `list-apps` to find a running app.
+  a display name. Use `list-apps` to find a running app. A network or device
+  path (`\\server\share`, `\\?\UNC\...`, `\\.\...`) is refused with
+  `INVALID_ARGS`, for the program and for `--cwd`, because opening it sends the
+  user's NetNTLM credentials to the remote host. Pass `--cwd` only with a
+  directory you trust: it decides which DLLs the new process loads first.
 - **Notifications:** `list-notifications` with the Action Center closed needs
   `--headed`. Single-item `dismiss-notification` and `notification-action` need
   `--headed` and `--expected-app` or `--expected-title` for the entry at INDEX.
@@ -91,7 +95,7 @@ observation, actions and capture there fail or return nothing.
 ## What differs on Windows
 
 - Ref actions are semantic UI Automation calls in headless and `--headed` mode, except `right-click`, `double-click`, `triple-click`, `type` and `focus`, which are physical or take focus and need `--headed`.
-- A ref resolves only when it was the only element in the window its snapshot captured with its role, native id, name and description, and exactly one live element still matches. Uniqueness counts the whole window, not the shallow tree a `--skeleton` or `--max-depth` snapshot presents, so a twin below the cut still refuses the ref. Identical twins, such as several identical `Delete` buttons, are refused with `AMBIGUOUS_TARGET`, `details.kind: identity_not_unique`, before anything reaches the app; a live second match is `saved_ref_ambiguous`, and a removed element is `STALE_REF`, `saved_ref_absent`. Take a fresh snapshot after a list changes, and use `--headed mouse-click --xy` when you must pick one of two identical controls.
+- A ref resolves only when it was the only element in the window its snapshot captured with its role, native id, name and description, and exactly one live element still matches. Uniqueness counts the whole window, not the shallow tree a `--skeleton` or `--max-depth` snapshot presents, so a twin below the cut still refuses the ref. Identical twins, such as several identical `Delete` buttons, are refused with `AMBIGUOUS_TARGET`, `details.kind: identity_not_unique`, before anything reaches the app; a live second match is `saved_ref_ambiguous`, and a removed element is `STALE_REF`, `saved_ref_absent`. Take a fresh snapshot after a list changes, and when you must pick one of two identical controls, ask the person which one is meant instead of clicking by position.
 - The cursor overlay plays its per-action travel only for headless semantic actions. A `--headed` action moves the real cursor instead.
 
 ## References

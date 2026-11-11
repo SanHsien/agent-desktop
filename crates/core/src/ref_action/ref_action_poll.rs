@@ -54,8 +54,10 @@ pub(crate) fn execute_poll_loop(
                 trace_resolve_ok(context.context, context.ref_id);
                 state.note_resolved();
                 ensure_before_deadline(deadline, &state)?;
-                let target =
-                    ResolvedRefAction::new(RefActionContext::new(context, deadline), &handle);
+                let target = ResolvedRefAction::new(
+                    RefActionContext::new(context, deadline),
+                    handle.for_reads(),
+                );
                 state.preflight_attempts = state.preflight_attempts.saturating_add(1);
                 if let Err(error) = preflight_resolved(&target, request, state.stability()) {
                     let error = into_adapter_error(error);

@@ -89,7 +89,7 @@ fn target_center(
         .ok()?;
         let bounds = context
             .adapter
-            .get_element_bounds(&handle, deadline)
+            .get_element_bounds(handle.for_reads(), deadline)
             .ok()
             .flatten()?;
         center_of(&bounds)

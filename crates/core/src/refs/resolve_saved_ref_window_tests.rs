@@ -116,3 +116,26 @@ fn a_token_missing_from_a_cut_short_read_is_not_proven_absent() {
     assert_eq!(absent.code, ErrorCode::StaleRef);
     assert_eq!(absent.details.expect("details")["kind"], "saved_ref_absent");
 }
+
+#[test]
+fn an_entry_without_a_window_id_refuses_two_windows_of_its_own_generation() {
+    let _guard = HomeGuard::new();
+    let mut adapter = RuleAdapter::new(tree_with(vec![node("button", "Run")]));
+    adapter.windows = vec![
+        window_of("w-0", 1, "test-instance"),
+        window_of("w-1", 1, "test-instance"),
+        window_of("w-9", 2, "test-instance"),
+    ];
+    let mut entry = entry();
+    entry.source.source_window_id = None;
+
+    let error = refused(&adapter, &entry);
+
+    assert_eq!(error.code, ErrorCode::AmbiguousTarget);
+    assert_eq!(
+        error.details.expect("details")["kind"],
+        "saved_ref_window_ambiguous"
+    );
+    assert_eq!(adapter.observations.load(Ordering::SeqCst), 0);
+    assert_eq!(adapter.anchors.load(Ordering::SeqCst), 0);
+}

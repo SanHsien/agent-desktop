@@ -30,8 +30,21 @@ Git 產品差異清單 + 表格
 | --- | --- | --- |
 | `apps/docs/content/docs/commands/app-window.mdx` | launch 的 `APP` 與 `--cwd` 說明加上：Windows 拒絕網路與裝置路徑、`--cwd` 只傳可信目錄（它決定新程序先載入哪份 DLL）、MCP 用戶端不能設 `cwd`，見 ADR-011 | 上游文件涵蓋同樣的警示，或本 fork 取回上游版本 |
 | `apps/docs/content/docs/guides/mcp.mdx` | Security 段改寫：MCP 用戶端等同使用者而非沙盒，列出 `--allow-launch`、`--allow-batch`、`--allow-file-write`、`--allow-cdp` 與永遠生效的限制（`force` 不提供、檔案路徑限制在 session 輸出目錄），見 ADR-011 | 上游 MCP 伺服器自帶等效預設關閉的限制與文件，或本 fork 取回上游版本 |
+| `apps/docs/content/docs/snapshots-and-refs.mdx` | AMBIGUOUS_TARGET 列的建議由「座標點擊可選其一」改為「重新 snapshot 挑唯一控制項，或請人確認」，與錯誤訊息一致，見 ADR-011 | 上游文件與錯誤建議都不再引導 agent 用座標點擊挑選相同控制項 |
 | `apps/docs/pnpm-lock.yaml` | minimatch 10.2.6 升到 11.0.5、`@vercel/geistdocs` 底下的 glob 11.1.0 升到 14.0.4，以修 Dependabot 告警 #5（minimatch < 11.0.1 受影響），見 ADR-010 | 上游 `apps/docs` 的 lockfile 已解到 minimatch >= 11.0.1，且 glob 版本宣告 minimatch ^11 |
 | `apps/docs/pnpm-workspace.yaml` | `overrides` 加 `@vercel/geistdocs>glob: 14.0.4` 與 `minimatch: 11.0.5`（兩者必須一起，只升 minimatch 會讓 glob 11 的萬用字元靜默回空），見 ADR-010 | `@vercel/geistdocs` 自行依賴 glob >= 14 且 `@ts-morph/common` 宣告 minimatch >= 11.0.1，兩條 override 可刪 |
+| `crates/core/src/ref_action/presentation.rs` | 游標疊加的目標中心經 `ProvisionalHandle::for_reads` 讀 bounds（暫定落點 handle 不再是裸 `NativeHandle`） | 上游以型別區分暫定落點與完整解析結果 |
+| `crates/core/src/ref_action/ref_action_poll.rs` | 輪詢迴圈拿到的暫定落點 handle 只經 `for_reads` 交給 actionability 預檢，不能傳進 dispatch | 上游以型別區分暫定落點與完整解析結果 |
+| `crates/core/src/refs/mod.rs` | 註冊 `recorded_window` 模組（從 `resolve_saved_ref.rs` 拆出） | 上游有等效模組佈局，或取回 `resolve_saved_ref.rs` 原貌 |
+| `crates/core/src/refs/recorded_window.rs` | 新檔：`recorded_window` 與其輔助函式，從 `resolve_saved_ref.rs` 拆出（該檔已 399 行）；entry 沒有 window id 時，同 pid 與同 generation 有多個視窗就回 `AMBIGUOUS_TARGET`（`saved_ref_window_ambiguous`），不再取第一個 | 上游在無 window id 且多個候選視窗時同樣拒絕 |
+| `crates/core/src/refs/ref_resolve_deadline.rs` | `land_within_deadline` 回 `ResolveAttemptOutcome<ProvisionalHandle>`，嘗試與分類函式改為泛型；測試指定 `NativeHandle` | 上游以型別區分暫定落點與完整解析結果 |
+| `crates/core/src/refs/ref_root_read.rs` | `recorded_window` 的匯入路徑改到新模組 | 隨 `recorded_window.rs` 取回上游而移除 |
+| `crates/core/src/refs/resolve_attempt_outcome.rs` | `ResolveAttemptOutcome` 改為泛型（預設 `NativeHandle`），讓暫定落點用 `ProvisionalHandle` | 上游以型別區分暫定落點與完整解析結果 |
+| `crates/core/src/refs/resolve_errors.rs` | `identity_not_unique` 的建議不再指向 `--headed` 座標點擊，改為重新 snapshot 挑唯一控制項或請人確認（座標點擊會點到該位置上的任何東西） | 上游建議文字同樣不引導座標點擊 |
+| `crates/core/src/refs/resolve_errors_tests.rs` | 新增建議文字不含座標點擊的測試 | 上游涵蓋同樣斷言 |
+| `crates/core/src/refs/resolve_saved_ref.rs` | 新增 `ProvisionalHandle`（無 Deref、無轉換；只能 `for_reads`），`land_saved_ref` 回它；`ambiguous_live_match` 建議改為重新 snapshot 或請人確認；`recorded_window` 與 `adapter_error` 移到 `recorded_window.rs` | 上游以型別保證暫定落點不進 dispatch |
+| `crates/core/src/refs/resolve_saved_ref_tests.rs` | 落點測試改用 `ProvisionalHandle`；新增 `ambiguous_live_match` 建議文字測試 | 隨 `resolve_saved_ref.rs` 取回上游而移除 |
+| `crates/core/src/refs/resolve_saved_ref_window_tests.rs` | 新增無 window id 且兩個同 generation 視窗時拒絕為 `AMBIGUOUS_TARGET` 的測試 | 上游涵蓋同樣斷言 |
 | `crates/core/src/session/tree.rs` | 非 Unix session 根目錄也經 `ensure_private`，避免只保護 trace 子目錄 | 上游在建立 session 時同樣保護根目錄，Windows session 測試通過 |
 | `crates/ffi/src/actions/result.rs` | 釋放 action result 時用 `as_mut` 檢查空指標；單元測試移到相鄰檔案以符合 400 行限制 | 上游涵蓋空 result 與 post-state 釋放，且檔案大小及 FFI 測試通過 |
 | `crates/ffi/src/actions/result_tests.rs` | 從 `result.rs` 拆出的 action result 轉換及釋放測試，包含空 result 測試 | 上游以符合 400 行限制的佈局保留相同測試覆蓋 |

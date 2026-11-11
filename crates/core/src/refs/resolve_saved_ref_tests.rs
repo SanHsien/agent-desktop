@@ -195,7 +195,7 @@ fn capture_and_resolution_agree_on_the_same_element() {
 fn land(
     adapter: &RuleAdapter,
     entry: &crate::RefEntry,
-) -> Result<crate::NativeHandle, crate::AdapterError> {
+) -> Result<super::ProvisionalHandle, crate::AdapterError> {
     super::land_saved_ref(adapter, entry, crate::Deadline::standard().unwrap())
 }
 
@@ -204,9 +204,10 @@ fn a_confirmed_landing_skips_the_whole_window_count() {
     let _guard = HomeGuard::new();
     let adapter = RuleAdapter::new(tree_with(vec![node("button", "Run")]));
 
-    land(&adapter, &entry()).expect("the recorded path lands the recorded element");
+    let landed = land(&adapter, &entry()).expect("the recorded path lands the recorded element");
 
     assert_eq!(adapter.counts(), (0, 1, 0, 1));
+    assert_eq!(landed.for_reads().downcast_ref::<&str>(), Some(&"anchor"));
 }
 
 #[test]
@@ -253,4 +254,15 @@ fn an_unproven_entry_is_never_landed_provisionally() {
 
     assert_eq!(error.details.unwrap()["kind"], "identity_not_unique");
     assert_eq!(adapter.counts(), (0, 0, 0, 0));
+}
+
+#[test]
+fn ambiguous_live_match_never_suggests_a_coordinate_click() {
+    let error = super::ambiguous_live_match(&entry());
+    let suggestion = error.suggestion.as_deref().expect("a suggestion");
+
+    assert!(!suggestion.contains("--headed"), "{suggestion}");
+    assert!(!suggestion.contains("coordinate"), "{suggestion}");
+    assert!(suggestion.contains("new snapshot"), "{suggestion}");
+    assert!(suggestion.contains("confirm"), "{suggestion}");
 }

@@ -32,8 +32,9 @@ pub(crate) fn identity_not_unique(entry: &RefEntry) -> AdapterError {
     .with_suggestion(
         "Either another element in the window matched it, or the window could not be read \
          whole within the snapshot timeout. For a large window, retake the snapshot with a \
-         larger --timeout-ms. Identical twins are refused again by every snapshot; where \
-         headed pointer input is available, an explicit --headed coordinate click can pick one.",
+         larger --timeout-ms. Identical twins are refused again by every snapshot, so neither \
+         can be picked by ref: take a new snapshot and act on a control that is unique in the \
+         window, or ask the person to confirm which one is meant.",
     )
     .with_details(json!({
         "kind": "identity_not_unique",

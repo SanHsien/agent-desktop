@@ -1,11 +1,12 @@
 use serde_json::json;
 
 use crate::{
-    AdapterError, AppError, Deadline, IdentityMatch, PlatformAdapter, RefEntry, WindowInfo,
+    AdapterError, Deadline, IdentityMatch, PlatformAdapter, RefEntry, WindowInfo,
     adapter::{NativeHandle, TreeOptions},
     locator::live_locator::{
         ObservationRequest, ObservationRoot, ObservedTree, materialize_ref_entry,
     },
+    refs::recorded_window::{adapter_error, recorded_window},
     refs::ref_full_predicate::FullPredicate,
     refs::ref_identity::element_token,
     refs::ref_live_predicate::LivePredicate,
@@ -45,20 +46,35 @@ pub fn resolve_saved_ref(
     Ok(handle)
 }
 
+/// A handle that landed a saved ref without the whole-window uniqueness count.
+///
+/// It converts to nothing: no `Deref`, no `From`, no way to take the
+/// [`NativeHandle`] out. A dispatch is handed the handle of a full
+/// [`resolve_saved_ref`], which is a plain `NativeHandle`, so the compiler
+/// rejects a provisional landing in a dispatch position. The only door is
+/// [`ProvisionalHandle::for_reads`], for actionability reads and presentation.
+pub(crate) struct ProvisionalHandle(NativeHandle);
+
+impl ProvisionalHandle {
+    pub(crate) fn for_reads(&self) -> &NativeHandle {
+        &self.0
+    }
+}
+
 /// Lands a tokenless saved ref at its recorded path and confirms the landed
 /// element against the full predicate, skipping the whole-window count.
 ///
-/// The count is what proves the ref still unique, so this handle may only feed
-/// a wait that runs a full [`resolve_saved_ref`] under the interaction lease
-/// before acting, or a presentation that never acts, such as placing the cursor
-/// overlay. A landing that fails or does not confirm falls back to the full
+/// The count is what proves the ref still unique, so the [`ProvisionalHandle`]
+/// may only feed a wait that runs a full [`resolve_saved_ref`] under the
+/// interaction lease before acting, or a presentation that never acts, such as
+/// placing the cursor overlay. A landing that fails or does not confirm falls back to the full
 /// resolution, so a moved, missing or twinned element gets the same verdict
 /// either way and only the common case is cheaper.
 pub(crate) fn land_saved_ref(
     adapter: &dyn PlatformAdapter,
     entry: &RefEntry,
     deadline: Deadline,
-) -> Result<NativeHandle, AdapterError> {
+) -> Result<ProvisionalHandle, AdapterError> {
     if element_token(entry).is_none()
         && entry.identity.unique_at_capture
         && let Ok(handle) = adapter.resolve_locator_anchor(entry, deadline)
@@ -69,10 +85,10 @@ pub(crate) fn land_saved_ref(
             root_ref: None,
         };
         if confirm_landed(adapter, entry, root, deadline, None).is_ok() {
-            return Ok(handle);
+            return Ok(ProvisionalHandle(handle));
         }
     }
-    resolve_saved_ref(adapter, entry, deadline, None)
+    resolve_saved_ref(adapter, entry, deadline, None).map(ProvisionalHandle)
 }
 
 /// The window a saved ref is captured from, one complete observation of it, and
@@ -161,71 +177,6 @@ fn confirm_landed(
         IdentityMatch::Unknown => Err(identity_unknown_error(entry)),
         IdentityMatch::NoMatch => Err(absent(entry)),
     }
-}
-
-/// The window the ref was captured from, never another window of the process;
-/// a process-owned ref's owner is its live process, whatever windows it opens.
-/// The surface lookup resolves shell surfaces, the focused window and a recorded
-/// window id; an entry with no window id falls back to the process's windows,
-/// where the generation says which one it was.
-pub(crate) fn recorded_window(
-    adapter: &dyn PlatformAdapter,
-    entry: &RefEntry,
-    deadline: Deadline,
-) -> Result<WindowInfo, AdapterError> {
-    if entry.source.is_process_owned() {
-        return crate::system::app_lookup::live_process_owner(adapter, entry, deadline)
-            .map_err(adapter_error);
-    }
-    let resolved = crate::snapshot::resolve_window_for_surface(
-        adapter,
-        entry.source.source_app.as_deref(),
-        entry.source.source_window_id.as_deref(),
-        entry.source.source_surface,
-        deadline,
-    );
-    let mut failure = None;
-    match resolved {
-        Ok(window) if belongs_to_entry(&window, entry) => return Ok(window),
-        Ok(_) => {}
-        Err(error) => failure = Some(adapter_error(error)),
-    }
-    if entry.source.source_window_id.is_some() {
-        return Err(failure.unwrap_or_else(gone));
-    }
-    let listed = adapter.list_windows(
-        &crate::adapter::WindowFilter {
-            focused_only: false,
-            app: entry.source.source_app.clone(),
-        },
-        deadline,
-    )?;
-    listed
-        .into_iter()
-        .find(|window| belongs_to_entry(window, entry))
-        .ok_or_else(|| failure.unwrap_or_else(gone))
-}
-
-fn gone() -> AdapterError {
-    AdapterError::stale_ref_because("The window the ref was captured from is gone")
-}
-
-/// Whether a live window is the one the entry was captured from: the owner kind,
-/// pid and a recorded window id must agree, and process generations must agree
-/// when both sides carry one, since some macOS window records omit it.
-fn belongs_to_entry(window: &WindowInfo, entry: &RefEntry) -> bool {
-    window.is_process_owner() == entry.source.is_process_owned()
-        && window.pid == entry.process.pid
-        && entry
-            .source
-            .source_window_id
-            .as_deref()
-            .is_none_or(|id| window.id == id)
-        && window
-            .process_instance
-            .as_deref()
-            .zip(entry.process.process_instance.as_deref())
-            .is_none_or(|(live, saved)| live == saved)
 }
 
 /// The one observation a tokenless ref is judged by, in the settings resolution
@@ -354,8 +305,8 @@ fn ambiguous_live_match(entry: &RefEntry) -> AdapterError {
     )
     .with_suggestion(
         "An element identical to the captured one appeared, so neither can be picked by ref and \
-         a new snapshot refuses both as twins. Act on a control that is unique in the window, or, \
-         where headed pointer input is available, use an explicit --headed coordinate click.",
+         a new snapshot refuses both as twins. Take a new snapshot and act on a control that is \
+         unique in the window, or ask the person to confirm which one is meant.",
     )
     .with_details(json!({
         "kind": "saved_ref_ambiguous",
@@ -373,13 +324,6 @@ fn absent(entry: &RefEntry) -> AdapterError {
             "complete": true,
             "role": entry.identity.role,
         }))
-}
-
-fn adapter_error(error: AppError) -> AdapterError {
-    match error {
-        AppError::Adapter(error) => error,
-        other => AdapterError::internal(other.to_string()),
-    }
 }
 
 #[cfg(test)]

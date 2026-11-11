@@ -3,8 +3,9 @@ use std::time::Duration;
 use serde_json::json;
 
 use crate::{
-    AdapterError, Deadline, ErrorCode, NativeHandle, PlatformAdapter, RefEntry,
+    AdapterError, Deadline, ErrorCode, PlatformAdapter, RefEntry,
     refs::resolve_attempt_outcome::ResolveAttemptOutcome,
+    refs::resolve_saved_ref::ProvisionalHandle,
 };
 
 pub(crate) const POLL_INTERVAL: Duration = Duration::from_millis(100);
@@ -28,22 +29,23 @@ pub(crate) fn resolve_within_deadline(
 }
 
 /// Runs one provisional landing attempt under the same slice as
-/// [`resolve_within_deadline`]. Its handle is fit only for a wait that a full
-/// resolution under the interaction lease follows before anything is sent.
+/// [`resolve_within_deadline`]. Its [`ProvisionalHandle`] is fit only for a wait
+/// that a full resolution under the interaction lease follows before anything
+/// is sent.
 pub(crate) fn land_within_deadline(
     adapter: &dyn PlatformAdapter,
     entry: &RefEntry,
     deadline: Deadline,
-) -> ResolveAttemptOutcome {
+) -> ResolveAttemptOutcome<ProvisionalHandle> {
     attempt_within_deadline(deadline, |slice| {
         crate::refs::resolve_saved_ref::land_saved_ref(adapter, entry, slice)
     })
 }
 
-fn attempt_within_deadline(
+fn attempt_within_deadline<H>(
     deadline: Deadline,
-    attempt: impl FnOnce(Deadline) -> Result<NativeHandle, AdapterError>,
-) -> ResolveAttemptOutcome {
+    attempt: impl FnOnce(Deadline) -> Result<H, AdapterError>,
+) -> ResolveAttemptOutcome<H> {
     if deadline.remaining_slice(RESOLVE_ATTEMPT).is_err() {
         return ResolveAttemptOutcome::DeadlinePassed;
     }
@@ -54,7 +56,7 @@ fn attempt_within_deadline(
     }
 }
 
-fn classify_error(error: AdapterError, deadline: Deadline) -> ResolveAttemptOutcome {
+fn classify_error<H>(error: AdapterError, deadline: Deadline) -> ResolveAttemptOutcome<H> {
     if error.code != ErrorCode::Timeout {
         return ResolveAttemptOutcome::Failed(error);
     }
@@ -85,6 +87,7 @@ fn mark_retryable(mut error: AdapterError) -> AdapterError {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::NativeHandle;
     use std::time::Instant;
 
     #[test]
@@ -93,7 +96,7 @@ mod tests {
             .with_details(json!({ "kind": "deadline" }));
 
         let ResolveAttemptOutcome::Failed(error) =
-            classify_error(error, Deadline::after(1_000).unwrap())
+            classify_error::<NativeHandle>(error, Deadline::after(1_000).unwrap())
         else {
             panic!("per-attempt timeout must remain inside the outer poll loop");
         };
@@ -108,7 +111,7 @@ mod tests {
             .with_details(json!({ "retryable": false }));
 
         let ResolveAttemptOutcome::Failed(error) =
-            classify_error(error, Deadline::after(1_000).unwrap())
+            classify_error::<NativeHandle>(error, Deadline::after(1_000).unwrap())
         else {
             panic!("explicit non-retryable timeout must remain terminal");
         };
@@ -122,7 +125,7 @@ mod tests {
             .with_disposition(crate::DeliverySemantics::uncertain());
 
         let ResolveAttemptOutcome::Failed(error) =
-            classify_error(error, Deadline::after(1_000).unwrap())
+            classify_error::<NativeHandle>(error, Deadline::after(1_000).unwrap())
         else {
             panic!("delivery-uncertain timeout must remain terminal");
         };
@@ -137,7 +140,7 @@ mod tests {
         let deadline = Deadline::at(started, 1).unwrap();
 
         assert!(matches!(
-            classify_error(AdapterError::timeout("attempt expired"), deadline),
+            classify_error::<NativeHandle>(AdapterError::timeout("attempt expired"), deadline),
             ResolveAttemptOutcome::DeadlinePassed
         ));
     }

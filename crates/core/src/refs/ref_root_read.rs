@@ -1,8 +1,9 @@
 use crate::{
     AppError, Deadline, PlatformAdapter, RefEntry, WindowInfo,
     adapter::NativeHandle,
+    refs::recorded_window::recorded_window,
     refs::ref_identity::element_token,
-    refs::resolve_saved_ref::{SavedRefMatch, observe_saved_ref, recorded_window},
+    refs::resolve_saved_ref::{SavedRefMatch, observe_saved_ref},
 };
 
 /// How a drill-down or a rooted find read its root: the root's subtree alone,

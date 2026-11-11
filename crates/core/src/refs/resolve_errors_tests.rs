@@ -84,3 +84,17 @@ fn mark_deadline_elapsed_fills_missing_details() {
 
     assert_eq!(stamped.details, Some(json!({ "deadline_elapsed": true })));
 }
+
+/// A twin refusal must never steer the agent toward a coordinate click: a
+/// click at a position hits whichever control sits there, which is the guess
+/// the ref identity rule exists to refuse.
+#[test]
+fn identity_not_unique_never_suggests_a_coordinate_click() {
+    let error = identity_not_unique(&entry_with_role("button"));
+    let suggestion = error.suggestion.as_deref().expect("a suggestion");
+
+    assert!(!suggestion.contains("--headed"), "{suggestion}");
+    assert!(!suggestion.contains("coordinate"), "{suggestion}");
+    assert!(suggestion.contains("new snapshot"), "{suggestion}");
+    assert!(suggestion.contains("confirm"), "{suggestion}");
+}
