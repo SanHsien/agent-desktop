@@ -146,13 +146,19 @@ fn a_command_sharing_the_cursor_waits_for_the_one_already_using_it() {
 }
 
 /// Separate sessions draw separate cursors, so one session's command in
-/// flight does not hold back another session's travel.
+/// flight does not hold back another session's travel. The busy session's
+/// cursor is held by this thread for the whole call and is never released
+/// early, so the other session's click completing at all proves it did not
+/// wait on that cursor, with no wall-clock threshold involved.
 #[test]
 fn a_command_in_another_session_travels_without_waiting() {
     let _home = HomeGuard::new();
     let busy = session("run-busy");
     let other = session("run-other");
-    let released = hold_elsewhere_for(&busy, Duration::from_millis(400));
+    let deadline = crate::Deadline::after(1_000).expect("a deadline");
+    let _busy_cursor = crate::cursor_overlay::hold_cursor(&busy, deadline)
+        .expect("the cursor lock")
+        .expect("a shared cursor");
     let adapter = TimedAdapter::default();
 
     execute_entry_with_context(
@@ -163,6 +169,5 @@ fn a_command_in_another_session_travels_without_waiting() {
     )
     .expect("click succeeds");
 
-    assert!(adapter.first(Event::Travel) < released);
     assert!(adapter.first(Event::Travel) <= adapter.first(Event::Lease));
 }

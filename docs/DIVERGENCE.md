@@ -100,3 +100,5 @@ Git 產品差異清單 + 表格
 | `src/tests/cli_process.rs` | Windows CLI scratch 目錄明設私有 ACL；batch session-end 測試拆到相鄰模組並公開 helper | 上游提供可用的 Windows 隔離目錄，並保留 batch 測試覆蓋及 400 行限制 |
 | `src/tests/mcp_process.rs` | 新增行程層測試：預設清單不含 launch、batch、session gc；force 與未列出的工具在執行前被拒；子行程在受限環境下回 `POLICY_DENIED`；`--allow-file-write` 無 session 時結束 | 上游行程測試涵蓋同樣的預設關閉行為 |
 | `src/tests/screen_sample.rs` | 螢幕像素測試改用固定大小 `as_chunks`，對齊 clippy 要求 | 上游保持相同 BGR 像素比對語意，螢幕取樣測試與 clippy 通過 |
+| `crates/core/src/trace/trace_artifacts_dispatch_budget_tests.rs` | `slow_pre_capture_preserves_dispatch_budget` 改用 `VirtualClock`，慢速截圖以虛擬時間推進，並斷言派送時預算不低於 500 ms 減 50 ms；原測試以牆鐘比較 500 ms 預算，預派送階段的真實 I/O 在慢速 runner 上會吃掉預算而誤判逾時 | 上游同名測試改用可控時鐘或等效的確定性斷言，且 Windows core 測試通過 |
+| `crates/core/src/ref_action/presentation_shared_cursor_tests.rs` | `a_command_in_another_session_travels_without_waiting` 改為由本執行緒持有另一工作階段游標鎖、不再以 400 ms 牆鐘門檻判定；完成即證明未等待該鎖 | 上游同名測試採用等效的確定性斷言，且 Windows core 測試通過 |

@@ -78,7 +78,7 @@ impl SystemOps for DeadlineConsumingScreenshotAdapter {
             } else {
                 deadline.remaining()
             };
-            std::thread::sleep(delay);
+            crate::wait::deadline::sleep(delay);
             return Err(deadline.timeout_error());
         }
         Ok(ImageBuffer {
@@ -91,9 +91,13 @@ impl SystemOps for DeadlineConsumingScreenshotAdapter {
     }
 }
 
+const DISPATCH_TIMEOUT_MS: u64 = 500;
+const SLOW_CAPTURE_MS: u64 = 50;
+
 #[test]
 fn slow_pre_capture_preserves_dispatch_budget() {
     let (_home, _lock) = setup_artifacts_test();
+    let _clock = VirtualClock::freeze();
     let manifest = artifacts_session();
     let context = CommandContext::new(Some(manifest.id), None, false).unwrap();
     let adapter = DeadlineConsumingScreenshotAdapter::new(true);
@@ -106,7 +110,7 @@ fn slow_pre_capture_preserves_dispatch_budget() {
             ref_id: "@e1",
             context: &context,
         },
-        ActionRequest::headless(Action::Click).with_timeout_ms(Some(500)),
+        ActionRequest::headless(Action::Click).with_timeout_ms(Some(DISPATCH_TIMEOUT_MS)),
         crate::ref_action::ref_action_single::dispatch_resolved,
     );
 
@@ -115,6 +119,11 @@ fn slow_pre_capture_preserves_dispatch_budget() {
         "slow trace capture blocked dispatch: {result:?}"
     );
     assert_eq!(adapter.dispatch_calls.load(Ordering::SeqCst), 1);
+    let dispatch_budget_ms = adapter.dispatch_budget_ms.load(Ordering::SeqCst);
+    assert!(
+        dispatch_budget_ms >= DISPATCH_TIMEOUT_MS - SLOW_CAPTURE_MS,
+        "only {dispatch_budget_ms} ms of the {DISPATCH_TIMEOUT_MS} ms budget survived the slow capture"
+    );
 }
 
 fn trace_body(trace_dir: &std::path::Path) -> String {
