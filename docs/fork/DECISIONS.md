@@ -214,3 +214,9 @@
   - 保留裝置名：`COM`／`LPT` 後接任何一位以上的數字（含多位數與上標）都拒絕；原本只認單一位數。
   - 程式搜尋與注入類環境變數擴充到 `PSMODULEPATH`、`PYTHONPATH`、`PYTHONSTARTUP`、`NODE_PATH`、`CLASSPATH`、`DOTNET_STARTUP_HOOKS`、`DOTNET_ADDITIONAL_DEPS`、`PERL5LIB`、`RUBYLIB`，與 `PATH` 同類、所有 opt-in 下都拒絕。
   - 重申：`--allow-launch` 才是真正的信任決定，這些清單與標記都是縱深防禦；開啟後 client 可以啟動 `cmd`、`powershell` 或直譯器，自己設定任何變數。
+- **第三次覆核的修正（2026-11-12，實證）**：
+  - **覆核指出的檢查缺陷為真，但目前不是可直接利用的越界寫入**。`is_inside` 找最近既有祖先時用 `Path::exists()`，它跟隨連結，懸空連結（目標不存在）回 false，於是被跳過、把輸出目錄當祖先放行。實證：在輸出目錄內以 `mklink /J` 建 junction、刪掉目標使其懸空，`is_inside(<out>\link\stolen.png)` 回 true（修前測試紅，`a_dangling_junction_under_the_output_directory_is_refused`）。
+  - **後段擋下的那一步**：寫入路徑為 `write_user_atomic`，先 `ensure_user` 建父目錄，Windows 上是 `create_dir_all(<out>\link)`；對懸空 junction 它回 `AlreadyExists`（Win32 183）而失敗，檔案不會寫出。檔案層的懸空 symlink 則由 `validate_user_destination` 以 `symlink_metadata` 拒絕。兩者都是既有行為，不是本函式保證的；本次修正讓檢查本身不再依賴它們。
+  - **修法**：`is_inside` 增加 `no_link_below`，逐層以 `symlink_metadata`（不跟隨）走過 root 之下每個部件，最終檔名也在內；任何 symlink 或 Windows reparse point（含懸空，`FILE_ATTRIBUTE_REPARSE_POINT`）即拒絕；第一個不存在的部件結束走訪。解析祖先改用 `symlink_metadata` 找，與走訪一致。測試：`a_dangling_junction_under_the_output_directory_is_refused`、`a_junction_named_as_the_output_file_is_refused_whether_or_not_it_resolves`（修前後各跑一次，紅→綠）。
+  - **未實測**：懸空的檔案 symlink。此環境建立 symlink 需系統管理員權限，只靠讀碼推論。
+  - **殘餘風險（TOCTOU）**：檢查通過到 `ensure_user` 之間仍有時序窗口，若有程序在輸出目錄內把某部件換成連結，寫入會跟隨。Windows 上要消除它需要 reparse-aware 的建檔與 final path 驗證，會動上游核心寫入路徑，本次不做。能在輸出目錄內放連結的只有 `--allow-launch` 開啟後的 client（可啟動 `cmd`），或同一使用者的其他程序；後者本來就能寫任意位置，前者已等同使用者，所以這個窗口不是 MCP 預設設定下的新增攻擊面。

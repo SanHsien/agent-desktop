@@ -72,25 +72,62 @@ pub(super) fn has_non_ascii_name(key: &str) -> bool {
 }
 
 /// True when `path` is an absolute path strictly below `root` that names only ordinary files and folders, with no
-/// `.` or `..` step. `root` must exist and the deepest existing part of `path` must resolve below it, so a junction
-/// or symlink inside `root` cannot lead out of it; anything that cannot be resolved is refused.
+/// `.` or `..` step. Every component below `root` is read with `symlink_metadata`, which does not follow links, and
+/// any symlink, junction or other reparse point there is refused whether or not its target exists. A component that
+/// does not exist ends the walk, since nothing can exist under it. The deepest existing part must also resolve below
+/// `root`. `root` must exist; anything that cannot be resolved is refused.
 pub(super) fn is_inside(path: &Path, root: &Path) -> bool {
     if !path.is_absolute()
         || !has_only_plain_steps(path)
         || !is_below(path, root)
         || !names_below_are_plain(path, root)
+        || !no_link_below(path, root)
     {
         return false;
     }
     let Ok(resolved_root) = root.canonicalize() else {
         return false;
     };
-    let Some(existing) = path.ancestors().find(|ancestor| ancestor.exists()) else {
+    let Some(existing) = path
+        .ancestors()
+        .find(|ancestor| std::fs::symlink_metadata(ancestor).is_ok())
+    else {
         return false;
     };
     existing
         .canonicalize()
         .is_ok_and(|resolved| resolved == resolved_root || is_below(&resolved, &resolved_root))
+}
+
+/// Walks the components below `root` one at a time without following links. A link of any kind on that walk, even
+/// a dangling one, returns false; a walk that cannot read a component also returns false.
+fn no_link_below(path: &Path, root: &Path) -> bool {
+    let mut current = root.to_path_buf();
+    for part in path.components().skip(root.components().count()) {
+        current.push(part);
+        match std::fs::symlink_metadata(&current) {
+            Ok(metadata) if is_link_like(&metadata) => return false,
+            Ok(_) => {}
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return true,
+            Err(_) => return false,
+        }
+    }
+    true
+}
+
+/// A symlink, or on Windows any reparse point (a junction, a mount point, or a cloud placeholder).
+fn is_link_like(metadata: &std::fs::Metadata) -> bool {
+    if metadata.file_type().is_symlink() {
+        return true;
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::MetadataExt;
+        const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x0400;
+        metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0
+    }
+    #[cfg(not(windows))]
+    false
 }
 
 fn has_only_plain_steps(path: &Path) -> bool {

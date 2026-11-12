@@ -279,3 +279,74 @@ fn an_unresolvable_target_is_refused_not_waved_through() {
     let fine = root.join("shot.png").to_string_lossy().into_owned();
     assert!(limits.check(&command(&["screenshot", &fine])).is_ok());
 }
+
+#[cfg(windows)]
+fn make_junction(link: &Path, target: &Path) {
+    let made = std::process::Command::new("cmd")
+        .args(["/C", "mklink", "/J"])
+        .arg(link)
+        .arg(target)
+        .output()
+        .expect("cmd runs");
+    assert!(made.status.success(), "mklink /J failed");
+}
+
+/// Removes only the junction itself: `rmdir` without `/S` never descends into the target.
+#[cfg(windows)]
+fn remove_junction(link: &Path) {
+    let _ = std::process::Command::new("cmd")
+        .args(["/C", "rmdir"])
+        .arg(link)
+        .status();
+}
+
+#[cfg(windows)]
+#[test]
+fn a_dangling_junction_under_the_output_directory_is_refused() {
+    let base = std::env::temp_dir().join(format!("agent-desktop-dangling-{}", std::process::id()));
+    let output = base.join("mcp-output");
+    let gone = base.join("outside").join("gone");
+    std::fs::create_dir_all(&output).expect("output dir");
+    std::fs::create_dir_all(&gone).expect("target dir");
+    let link = output.join("link");
+    make_junction(&link, &gone);
+    std::fs::remove_dir(&gone).expect("the target goes, leaving the junction dangling");
+    let checks = [
+        is_inside(&link.join("stolen.png"), &output),
+        is_inside(&link.join("nested").join("stolen.png"), &output),
+        is_inside(&link, &output),
+    ];
+    remove_junction(&link);
+    let _ = std::fs::remove_dir_all(&base);
+    assert_eq!(
+        checks,
+        [false, false, false],
+        "a link whose target does not exist must not be skipped as if it were absent"
+    );
+}
+
+#[cfg(windows)]
+#[test]
+fn a_junction_named_as_the_output_file_is_refused_whether_or_not_it_resolves() {
+    let base =
+        std::env::temp_dir().join(format!("agent-desktop-final-link-{}", std::process::id()));
+    let output = base.join("mcp-output");
+    let live = base.join("outside").join("live");
+    let gone = base.join("outside").join("gone");
+    std::fs::create_dir_all(&output).expect("output dir");
+    std::fs::create_dir_all(&live).expect("live target");
+    std::fs::create_dir_all(&gone).expect("gone target");
+    let live_link = output.join("live.png");
+    let gone_link = output.join("gone.png");
+    make_junction(&live_link, &live);
+    make_junction(&gone_link, &gone);
+    std::fs::remove_dir(&gone).expect("the second target goes");
+    let checks = [
+        is_inside(&live_link, &output),
+        is_inside(&gone_link, &output),
+    ];
+    remove_junction(&live_link);
+    remove_junction(&gone_link);
+    let _ = std::fs::remove_dir_all(&base);
+    assert_eq!(checks, [false, false]);
+}
