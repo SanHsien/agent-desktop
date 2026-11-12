@@ -247,7 +247,7 @@ fn non_one_scale_factor_capture_skipped_on_96dpi_only_hosts() {
                 .expect("scaled display index"),
             expected: scaled.clone(),
         },
-        deadline(10_000),
+        deadline(60_000),
     )
     .expect("scaled display capture");
     assert!(

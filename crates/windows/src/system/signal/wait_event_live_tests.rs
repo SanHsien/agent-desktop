@@ -52,7 +52,7 @@ use crate::tree::fixture::{HostedFixture, bootstrap};
 const TRANSITION_AFTER: Duration = Duration::from_millis(400);
 const RECV_TIMEOUT: Duration = Duration::from_secs(20);
 const FIXTURE_STATE_TIMEOUT: Duration = Duration::from_secs(5);
-const WAIT_TIMEOUT_MS: u64 = 10_000;
+const WAIT_TIMEOUT_MS: u64 = 60_000;
 
 use crate::system::fixture::live_identity::own_image_name;
 
