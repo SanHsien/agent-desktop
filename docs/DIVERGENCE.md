@@ -71,7 +71,7 @@ Git 產品差異清單 + 表格
 | `crates/windows/src/system/private_file/dacl.rs` | 驗證既有 ACL 時接受 Owner Rights 與 Creator Owner SID；建立時的授權集合不變 | 上游涵蓋這兩種 SID 並仍拒絕其他主體，私有檔案 ACL 測試通過 |
 | `crates/windows/src/system/private_file/tests.rs` | private-file scratch 目錄明設 ACL，包含 Owner Rights 與目前使用者 | 上游 fixture 可建立與驗證相同安全邊界的私有目錄 |
 | `crates/windows/src/system/runtime/mod.rs` | 新增輸入桌面附掛 helper；OpenInputDesktop 或 SetThreadDesktop 失敗不回報給呼叫端 | 上游提供等效桌面處理並通過隔離桌面測試，再移除本地 helper 及其使用點 |
-| `crates/windows/src/system/signal/signal_inventory_command_live_tests.rs` | 無轉換事件的等待上限由 1500 改為 3000 ms；基線計數測試改以測試端預先擷取（60 s 預算）的基線經 `with_event_baseline` 種入，不再依賴等待內的即時擷取在 3 s 內完成 | 上游測試在同類 Windows 負載下以原預算穩定通過，或有不靠放寬預算的同步方式 |
+| `crates/windows/src/system/signal/signal_inventory_command_live_tests.rs` | 無轉換事件的等待上限由 1500 改為 3000 ms；基線計數測試改以測試端預先擷取（60 s 預算）的基線經 `with_event_baseline` 種入，不再依賴等待內的即時擷取在 3 s 內完成；可重試失敗證據測試改為以 60 s 預算預先擷取的失敗經 `with_event_baseline` 種入（不再依賴 3 s 內強制輪詢失敗），斷言改為「可重試碼之一」（後續真實輪詢的 TIMEOUT 會覆寫 last_error） | 上游測試在同類 Windows 負載下以原預算穩定通過，或有不靠放寬預算的同步方式 |
 | `crates/windows/src/system/window/window_enum.rs` | EnumWindows 前附掛桌面、清除 LastError，回 0 但沒有錯誤時不報失敗；測試改用 `mem::take` | 上游正確區分停止列舉與 Win32 錯誤，隔離桌面列舉及 clippy 通過 |
 | `crates/windows/src/tree/fixture/fixture_clipboard.rs` | 延遲剪貼簿 owner 改用既有有界重試，容忍其他程式暫時占用剪貼簿 | 上游處理相同占用競態，延遲剪貼簿 fixture 測試通過 |
 | `crates/windows/src/tree/fixture/fixture_menu.rs` | menu 子程序與執行緒附掛桌面並 bootstrap，另輸出子程序診斷行 | 上游 menu fixture 在隔離桌面能正常就緒，移除診斷輸出後仍可定位失敗 |
