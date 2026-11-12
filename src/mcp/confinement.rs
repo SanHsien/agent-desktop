@@ -4,11 +4,12 @@
 use std::ffi::OsStr;
 use std::path::{Component, Path};
 
-const DEBUG_MARKERS: [&str; 9] = [
+const DEBUG_MARKERS: [&str; 10] = [
     "remote-debugging",
     "remote-allow-origins",
     "inspect",
     "marionette",
+    "start-debugger-server",
     "jdwp",
     "agentlib",
     "xrunjdwp",
@@ -23,20 +24,44 @@ const INSPECTOR_ENV_KEYS: [&str; 5] = [
     "JDK_JAVA_OPTIONS",
 ];
 const ELECTRON_ENV_PREFIX: &str = "ELECTRON_";
-const PROGRAM_SEARCH_ENV_KEYS: [&str; 12] = [
+/// Variables that decide which program, DLL, module or helper a new process finds or loads, or that name a program
+/// the process runs on its own (an SSH, askpass, editor or pager helper, a Git config injection). Refused for MCP
+/// clients under every opt-in, because none of them is needed to drive a managed app.
+const CODE_LOADING_ENV_KEYS: &[&str] = &[
     "PATH",
     "PATHEXT",
     "COMSPEC",
     "PSMODULEPATH",
     "PYTHONPATH",
     "PYTHONSTARTUP",
+    "PYTHONHOME",
+    "PYTHONUSERBASE",
     "NODE_PATH",
+    "NODE_REPL_EXTERNAL_MODULE",
     "CLASSPATH",
     "DOTNET_STARTUP_HOOKS",
     "DOTNET_ADDITIONAL_DEPS",
     "PERL5LIB",
+    "PERL5OPT",
     "RUBYLIB",
+    "RUBYOPT",
+    "BASH_ENV",
+    "GIT_SSH",
+    "GIT_SSH_COMMAND",
+    "GIT_EXEC_PATH",
+    "GIT_ASKPASS",
+    "SSH_ASKPASS",
+    "GIT_EDITOR",
+    "GIT_PAGER",
+    "GIT_PROXY_COMMAND",
+    "GIT_EXTERNAL_DIFF",
 ];
+/// Git reads its configuration, including `core.sshCommand` and `core.pager`, from these variables.
+const GIT_CONFIG_ENV_PREFIX: &str = "GIT_CONFIG_";
+/// The .NET and CoreCLR profiler settings in every spelling, with or without an architecture suffix such as `_64`.
+/// A profiler loads a native DLL into the process, so any name under these prefixes that mentions `PROFIL` is refused.
+const PROFILER_ENV_PREFIXES: &[&str] = &["COR_", "CORECLR_", "DOTNET_"];
+const PROFILER_ENV_MARKER: &str = "PROFIL";
 const RESERVED_DEVICES: [&str; 6] = ["CON", "PRN", "AUX", "NUL", "CONIN$", "CONOUT$"];
 const NUMBERED_DEVICES: [&str; 2] = ["COM", "LPT"];
 const FORBIDDEN_NAME_CHARACTERS: [char; 7] = [':', '<', '>', '"', '|', '?', '*'];
@@ -60,9 +85,14 @@ pub(super) fn is_inspector_env_key(key: &str) -> bool {
     INSPECTOR_ENV_KEYS.contains(&upper.as_str()) || upper.starts_with(ELECTRON_ENV_PREFIX)
 }
 
-/// Variables that decide which executable, DLL or module a new process finds or loads first.
-pub(super) fn is_program_search_env_key(key: &str) -> bool {
-    PROGRAM_SEARCH_ENV_KEYS.contains(&key.to_ascii_uppercase().as_str())
+/// Variables that decide which program, DLL or module a new process finds or loads, or that make it run a helper.
+pub(super) fn is_code_loading_env_key(key: &str) -> bool {
+    let upper = key.to_ascii_uppercase();
+    CODE_LOADING_ENV_KEYS.contains(&upper.as_str())
+        || upper.starts_with(GIT_CONFIG_ENV_PREFIX)
+        || PROFILER_ENV_PREFIXES
+            .iter()
+            .any(|prefix| upper.starts_with(prefix) && upper.contains(PROFILER_ENV_MARKER))
 }
 
 /// Windows folds the case of non-ASCII letters in variable names (a dotless i matches `I`), which no ASCII
@@ -189,3 +219,7 @@ fn is_device_stem(upper: &str) -> bool {
 #[cfg(test)]
 #[path = "confinement_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "confinement_env_tests.rs"]
+mod env_tests;

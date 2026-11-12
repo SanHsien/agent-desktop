@@ -7,7 +7,7 @@ use agent_desktop_core::{AdapterError, AppError, DeliverySemantics, ErrorCode};
 use std::path::{Path, PathBuf};
 
 use super::confinement::{
-    env_key, has_non_ascii_name, is_inside, is_inspector_env_key, is_program_search_env_key,
+    env_key, has_non_ascii_name, is_code_loading_env_key, is_inside, is_inspector_env_key,
     mentions_debug_endpoint,
 };
 use crate::cli::Commands;
@@ -163,11 +163,11 @@ impl Restrictions {
         if let Some(entry) = args
             .env
             .iter()
-            .find(|entry| is_program_search_env_key(env_key(entry)))
+            .find(|entry| is_code_loading_env_key(env_key(entry)))
         {
             return Err(denied(
                 format!(
-                    "launch --env {} is not available to MCP clients: it decides which program or DLL the new process finds first",
+                    "launch --env {} is not available to MCP clients: it decides which program, DLL or module the new process finds or loads",
                     env_key(entry)
                 ),
                 "Omit that variable; the app starts with the server's own search path.",

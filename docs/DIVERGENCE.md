@@ -92,6 +92,7 @@ Git 產品差異清單 + 表格
 | `src/mcp/catalog_tests.rs` | 測試輔助 `tools()` 改為全開限制；新增「每個路徑型參數都有檔案限制或不提供」與「預設目錄不含 launch、batch、session gc」測試 | 隨 `src/mcp/catalog.rs` 取回上游而移除 |
 | `src/mcp/confinement.rs` | 新檔：MCP 限制的路徑與參數檢查——輸出目錄內判定（輸出目錄不存在或無法解析即拒絕；逐層不跟隨連結地走過輸出目錄之下的每個部件，symlink 或 junction 等 reparse point 即使懸空也拒絕；拒絕保留裝置名與尾端點或空白與串流）、launch 環境變數（inspector 類與 PATH 類）與 debug 端點的子字串掃描，見 ADR-011 的推送前審查修正 | 隨 `src/mcp/restrictions.rs` 取回上游或上游自帶等效檢查而移除 |
 | `src/mcp/confinement_tests.rs` | 新檔：confinement 的測試，含環境變數、嵌入式開關、PATH 類變數、close-app force、裝置名與不存在的輸出目錄、懸空 junction 與以 junction 命名的輸出檔 | 隨 `src/mcp/confinement.rs` 移除 |
+| `src/mcp/confinement_env_tests.rs` | 新檔：launch 環境變數（程式載入、profiler、Git 設定注入）與 Firefox debugger 參數的測試，先紅後綠，含誤擋邊界 | 隨 `src/mcp/confinement.rs` 移除 |
 | `src/mcp/exposure.rs` | 新檔：決定哪些工具與參數在某組限制下公開、哪些參數是檔案路徑、相對路徑如何改寫（`catalog.rs` 已接近 400 行） | 隨 `src/mcp/catalog.rs` 取回上游而移除 |
 | `src/mcp/exposure_tests.rs` | 新檔：公開範圍與路徑改寫測試 | 隨 `src/mcp/exposure.rs` 移除 |
 | `src/mcp/mod.rs` | `mcp` 子命令加四個 `--allow-*` 旗標；`serve` 解析限制並傳給子行程，session 不存在時拒絕 `--allow-file-write`；INSTRUCTIONS 說明預設關閉與「不是沙盒」；`Server` 改持有 `ChildSetup` | 上游 MCP 伺服器提供等效旗標與說明，或取回上游版本 |
