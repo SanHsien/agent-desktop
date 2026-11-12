@@ -15,7 +15,7 @@
 #![cfg(target_os = "windows")]
 
 use agent_desktop_core::commands::wait::{self, WaitArgs, WaitModeArgs, WaitPredicateArgs};
-use agent_desktop_core::{AppError, CommandContext, ErrorCode};
+use agent_desktop_core::{AppError, CommandContext, Deadline, ErrorCode, SignalFilter, SystemOps};
 
 use super::force_race;
 use crate::adapter::WindowsAdapter;
@@ -92,6 +92,14 @@ fn a_capture_failure_mid_wait_does_not_abort_and_surfaces_as_last_error_in_the_t
     drop(fixture);
 }
 
+/// The property: once a real baseline exists, the timeout envelope reports its
+/// counts. The baseline is captured here with a generous, load-independent
+/// budget and handed to the wait through the same seed the CLI and batch
+/// runner use, so the 3 s wait budget no longer has to fit a real desktop
+/// capture. Under CPU pressure a live capture can outlast 3 s; the wait then
+/// correctly discards it (the adapter contract returns TIMEOUT for an
+/// observation completed at or after the deadline), which is what made this
+/// test flaky when it depended on the in-wait capture finishing in time.
 #[test]
 fn the_timeout_envelope_carries_baseline_counts_once_a_baseline_was_captured() {
     bootstrap();
@@ -99,9 +107,16 @@ fn the_timeout_envelope_carries_baseline_counts_once_a_baseline_was_captured() {
     let window_id = format!("w-{}", fixture.handle() as usize);
     let args = event_args("window-closed", window_id, NO_TRANSITION_TIMEOUT_MS);
     let adapter = WindowsAdapter::new();
+    let seed = adapter
+        .capture_signal_baseline(
+            &SignalFilter::default(),
+            Deadline::after(60_000).expect("a bounded capture deadline"),
+        )
+        .expect("a live baseline capture completes within 60 s");
+    let context = CommandContext::default().with_event_baseline(Some(Ok(seed)));
 
     let details = timeout_details(
-        wait::execute(args, &adapter, &CommandContext::default())
+        wait::execute(args, &adapter, &context)
             .expect_err("no transition occurred, so the wait must time out"),
     );
     let counts = &details["baseline_counts"];
