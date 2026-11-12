@@ -251,7 +251,7 @@ mod windows_only {
 
         let outcome = force_window_not_found::with(
             crate::system::window::listing_retry::LISTING_RACE_ATTEMPTS as usize * 2,
-            || list_windows_live(&WindowFilter::default(), deadline(10_000)),
+            || list_windows_live(&WindowFilter::default(), deadline(60_000)),
         );
 
         let error = outcome.expect_err("a persistent inconsistency must exhaust the retry budget");

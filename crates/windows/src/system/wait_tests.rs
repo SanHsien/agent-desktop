@@ -157,6 +157,8 @@ fn already_in_the_requested_state_returns_immediately_reading_the_predicate_once
     );
 }
 
+/// Pins the direction-specific lead of the detail; the zero-poll suffix is
+/// covered deterministically by `wait_expiry_detail_tests.rs`.
 #[test]
 fn a_menu_that_never_transitions_times_out_with_direction_specific_platform_detail() {
     bootstrap();
@@ -183,13 +185,11 @@ fn a_menu_that_never_transitions_times_out_with_direction_specific_platform_deta
 
     assert_eq!(open_error.code, ErrorCode::Timeout);
     assert_eq!(close_error.code, ErrorCode::Timeout);
-    assert_eq!(
-        open_error.platform_detail.as_deref(),
-        Some("No menu opened before the deadline")
-    );
-    assert_eq!(
-        close_error.platform_detail.as_deref(),
-        Some("Menu did not close before the deadline")
+    let open_detail = open_error.platform_detail.unwrap_or_default();
+    let close_detail = close_error.platform_detail.unwrap_or_default();
+    assert!(
+        open_detail.starts_with("No menu opened") && close_detail.starts_with("Menu did not close"),
+        "{open_detail} / {close_detail}"
     );
 }
 
