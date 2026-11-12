@@ -220,3 +220,5 @@
   - **修法**：`is_inside` 增加 `no_link_below`，逐層以 `symlink_metadata`（不跟隨）走過 root 之下每個部件，最終檔名也在內；任何 symlink 或 Windows reparse point（含懸空，`FILE_ATTRIBUTE_REPARSE_POINT`）即拒絕；第一個不存在的部件結束走訪。解析祖先改用 `symlink_metadata` 找，與走訪一致。測試：`a_dangling_junction_under_the_output_directory_is_refused`、`a_junction_named_as_the_output_file_is_refused_whether_or_not_it_resolves`（修前後各跑一次，紅→綠）。
   - **未實測**：懸空的檔案 symlink。此環境建立 symlink 需系統管理員權限，只靠讀碼推論。
   - **殘餘風險（TOCTOU）**：檢查通過到 `ensure_user` 之間仍有時序窗口，若有程序在輸出目錄內把某部件換成連結，寫入會跟隨。Windows 上要消除它需要 reparse-aware 的建檔與 final path 驗證，會動上游核心寫入路徑，本次不做。能在輸出目錄內放連結的只有 `--allow-launch` 開啟後的 client（可啟動 `cmd`），或同一使用者的其他程序；後者本來就能寫任意位置，前者已等同使用者，所以這個窗口不是 MCP 預設設定下的新增攻擊面。
+  - **取捨（拒絕方向）**：輸出目錄之下的 reparse point 一律拒絕，包括雲端佔位檔與去重檔。預設輸出位置不在 OneDrive，代價只是誤擋罕見的合法路徑，不會放行任何越界路徑。
+  - **測試釘住點**：`a_live_junction_back_into_the_output_directory_is_refused_too` 只靠 `no_link_below` 擋下（拿掉它即紅）；懸空的兩個測試在祖先判定那道也會被擋，所以不獨佔這條性質。
