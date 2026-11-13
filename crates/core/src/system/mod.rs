@@ -26,3 +26,4 @@ pub(crate) mod window_lookup;
 pub(crate) mod window_op;
 pub(crate) mod window_readback;
 pub(crate) mod window_state;
+pub(crate) mod windows_path;

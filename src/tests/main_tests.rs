@@ -56,3 +56,37 @@ fn pre_dispatch_failures_are_always_safe_to_retry() {
         );
     }
 }
+
+#[cfg(target_os = "windows")]
+#[test]
+fn unc_global_trace_and_debug_paths_are_rejected_before_command_setup() {
+    for args in [
+        vec![
+            "agent-desktop",
+            "version",
+            "--trace",
+            r"\\server\share\trace.jsonl",
+        ],
+        vec![
+            "agent-desktop",
+            "version",
+            "--debug",
+            "--screenshot",
+            r"\\server\share\debug.html",
+        ],
+    ] {
+        let mut cli = crate::Cli::try_parse_from(args).unwrap();
+        let command = cli.command.take().unwrap();
+        let error = crate::execute(cli, command).unwrap_err();
+        assert_eq!(error.code(), "INVALID_ARGS");
+        assert!(error.to_string().contains("UNC"), "{error}");
+        let AppError::Adapter(error) = error else {
+            panic!("path rejection must carry a delivery disposition");
+        };
+        assert_eq!(error.disposition.retry(), RetryDisposition::Safe);
+        assert_eq!(
+            error.disposition.delivery(),
+            DeliveryDisposition::NotDelivered
+        );
+    }
+}

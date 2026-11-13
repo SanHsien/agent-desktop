@@ -66,7 +66,7 @@ Git 產品差異清單 + 表格
 | `crates/windows/src/system/launch_cwd_tests.rs` | 新增 `absolute_cwd` 拒絕網路與裝置路徑、保留本機 verbatim 路徑的測試（`launch_tests.rs` 已 392 行，放不下） | 上游測試以符合 400 行限制的佈局涵蓋相同斷言 |
 | `crates/windows/src/system/launch_lease_isolation_tests.rs` | 子程序環境傾印明確使用 cmd /U 與嚴格 UTF-16LE 解碼，並驗證非 ASCII 值，避免將本機碼頁誤當 UTF-8 | 上游具備與碼頁無關的子程序 lease key 隔離測試，且在碼頁 950 與 65001 通過 |
 | `crates/windows/src/system/launch_live_tests.rs` | `bare_name_never_chooses_planted_binary_in_current_directory` 不再啟動系統 Notepad（改啟動 `ping.exe -n 30 127.0.0.1`，解析檢查對 `notepad.exe` 與 `ping.exe` 都保留）；live 測試的鎖改用 `notepad_launch_lock()`，鎖被毒化時仍取得 guard。成因：當日 Notepad 啟動即崩潰，以及已開著 Notepad 時 `attach_if_running: false` 必拒，見 ADR-009 | 上游 launch live 測試不依賴系統 Notepad 的存活，且單一測試 panic 不會讓同群測試連帶 `PoisonError` |
-| `crates/windows/src/system/launch_path.rs` | launch 識別字拒絕 UNC、`\\?\UNC\`、`\\.\` 等裝置命名空間與其正斜線寫法（只認 `X:\` 與 `\\?\X:\`），在 `is_file` 之前回 `INVALID_ARGS`；`is_file` 對 `\\server\...` 會發 SMB 而洩漏 NetNTLM，並可執行遠端 exe。獨立覆核發現，見 ADR-011 | 上游 `launch_identifier` 與 `resolve_executable` 同樣在碰檔案系統前拒絕非本機磁碟路徑，且網路路徑測試通過 |
+| `crates/windows/src/system/launch_path.rs` | launch 與 CLI 檔案參數共用 core 判斷，NT 前綴只接受絕對磁碟路徑；launch 識別字拒絕 UNC、`\\?\UNC\`、`\\.\` 等裝置命名空間與其正斜線寫法（只認 `X:\` 與 `\\?\X:\`），在 `is_file` 之前回 `INVALID_ARGS`；`is_file` 對 `\\server\...` 會發 SMB 而洩漏 NetNTLM，並可執行遠端 exe。獨立覆核發現，見 ADR-011 | 上游 `launch_identifier` 與 `resolve_executable` 同樣在碰檔案系統前拒絕非本機磁碟路徑，且網路路徑測試通過 |
 | `crates/windows/src/system/launch_path_network_tests.rs` | 新增網路與裝置路徑拒絕測試：識別字、`resolve_executable`（確認回 `INVALID_ARGS` 而非 `APP_NOT_FOUND`，即未碰檔案系統）、偵測函式與本機 verbatim 路徑仍可用 | 上游以符合 400 行限制的佈局保留相同覆蓋 |
 | `crates/windows/src/system/private_file/dacl.rs` | 驗證既有 ACL 時接受 Owner Rights 與 Creator Owner SID；建立時的授權集合不變 | 上游涵蓋這兩種 SID 並仍拒絕其他主體，私有檔案 ACL 測試通過 |
 | `crates/windows/src/system/private_file/tests.rs` | private-file scratch 目錄明設 ACL，包含 Owner Rights 與目前使用者 | 上游 fixture 可建立與驗證相同安全邊界的私有目錄 |
@@ -86,7 +86,7 @@ Git 產品差異清單 + 表格
 | `crates/windows/src/tree/hit_test/envelope_tests.rs` | occluded headed auto-wait 測試預算由 80 改為 1000 ms，仍驗證 ACTION_FAILED 與 not_delivered | 上游在同類 Windows 負載下用原預算穩定驗證相同合約，或改用確定性同步 |
 | `crates/windows/src/tree/surface_inventory_tests.rs` | 無視窗程序 fixture 改找任何可讀 generation token 的程序，移除固定系統程序名稱限制 | 上游 fixture 不依賴特定程序名稱且仍驗證空 inventory |
 | `crates/windows/src/tree/walk/cache_tests.rs` | 測試接受 Batch 或 Skip，放寬原本只能 Batch 的斷言；此差異降低策略驗證強度 | 上游以可控制的 fixture 明確驗證 cache policy，或能證明兩種結果都符合測試前提 |
-| `src/command_policy/mod.rs` | `preflight` 開頭呼叫 `mcp::restrictions::enforce`：由 MCP 伺服器啟動的子行程在動作前拒絕 force、launch、batch、檔案路徑等超出限制的指令；batch 的每個項目走同一個 `preflight`，所以 batch 無法繞過 | 上游 MCP 伺服器在子行程端強制等效限制，或本 fork 取回上游版本 |
+| `src/command_policy/mod.rs` | Windows `preflight` 先共用檔案路徑檢查拒絕 UNC 與裝置命名空間，再呼叫 `mcp::restrictions::enforce`：由 MCP 伺服器啟動的子行程在動作前拒絕 force、launch、batch、檔案路徑等超出限制的指令；batch 的每個項目走同一個 `preflight`，所以 batch 無法繞過 | 上游 MCP 伺服器在子行程端強制等效限制，或本 fork 取回上游版本 |
 | `src/mcp/call.rs` | 子行程啟動時帶入 `ChildSetup`（全域旗標加上 MCP 限制的環境變數），取代單純的 `globals`（函式參數不得超過 5 個） | 上游 MCP 伺服器把限制傳給子行程，或取回上游版本 |
 | `src/mcp/catalog.rs` | 工具清單與 schema 依 `Restrictions` 過濾（隱藏 launch、batch、session gc、`force`、`cwd`、未開啟的檔案與 cdp 參數）；相對檔案路徑改寫到 session 輸出目錄；trace export 預設輸出路徑落在該目錄 | 上游 MCP 目錄自行過濾危險工具與參數，或取回上游版本 |
 | `src/mcp/catalog_tests.rs` | 測試輔助 `tools()` 改為全開限制；新增「每個路徑型參數都有檔案限制或不提供」與「預設目錄不含 launch、batch、session gc」測試 | 隨 `src/mcp/catalog.rs` 取回上游而移除 |
@@ -107,3 +107,12 @@ Git 產品差異清單 + 表格
 | `src/tests/screen_sample.rs` | 螢幕像素測試改用固定大小 `as_chunks`，對齊 clippy 要求 | 上游保持相同 BGR 像素比對語意，螢幕取樣測試與 clippy 通過 |
 | `crates/core/src/trace/trace_artifacts_dispatch_budget_tests.rs` | `slow_pre_capture_preserves_dispatch_budget` 改用 `VirtualClock`，慢速截圖以虛擬時間推進，並斷言派送時預算不低於 500 ms 減 50 ms；原測試以牆鐘比較 500 ms 預算，預派送階段的真實 I/O 在慢速 runner 上會吃掉預算而誤判逾時 | 上游同名測試改用可控時鐘或等效的確定性斷言，且 Windows core 測試通過 |
 | `crates/core/src/ref_action/presentation_shared_cursor_tests.rs` | `a_command_in_another_session_travels_without_waiting` 改為由本執行緒持有另一工作階段游標鎖、不再以 400 ms 牆鐘門檻判定；完成即證明未等待該鎖 | 上游同名測試採用等效的確定性斷言，且 Windows core 測試通過 |
+| `src/command_policy/file_path.rs` | Windows CLI 檔案路徑使用 core 共用詞法檢查，拒絕 UNC、NT 遠端前綴與裝置命名空間 | 上游提供相同路徑限制與測試 |
+| `src/command_policy/file_path_tests.rs` | 保留本機相對、磁碟與延伸磁碟路徑，並驗證 UNC、裝置路徑與 batch 檔案參數拒絕的測試 | 上游提供相同路徑限制與測試 |
+| `src/command_policy/tests.rs` | Windows UNC 路徑在權限檢查與檔案存取前拒絕的回歸測試 | 上游提供相同路徑限制與測試 |
+| `src/tests/main_tests.rs` | 全域 trace 與 debug 截圖路徑在命令初始化前拒絕 UNC 的測試 | 上游提供相同路徑限制與測試 |
+| `src/main.rs` | Windows 全域 trace、debug 截圖與指令檔案路徑在命令初始化前檢查 | 上游在相同邊界拒絕 UNC 與裝置路徑 |
+| `crates/core/src/lib.rs` | 匯出共用的 Windows 網路與裝置路徑判斷 | 上游提供等效共用判斷 |
+| `crates/core/src/system/mod.rs` | 註冊不存取檔案系統的 Windows 路徑判斷模組 | 上游提供等效共用判斷 |
+| `crates/core/src/system/windows_path.rs` | CLI 檔案與 launch 共用路徑判斷；NT 與延伸前綴只接受絕對磁碟路徑 | 上游提供等效路徑限制 |
+| `crates/core/src/system/windows_path_tests.rs` | 拒絕 NT UNC、GLOBALROOT、裝置與相對磁碟路徑，保留本機路徑 | 上游提供等效路徑測試 |

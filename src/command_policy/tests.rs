@@ -218,3 +218,59 @@ fn a_multi_agent_desktop_action_needs_an_agent_id_on_every_platform() {
     assert!(!agent_id_missing(&click, false, None));
     assert!(!agent_id_missing(&Commands::Status, true, None));
 }
+
+#[cfg(target_os = "windows")]
+#[test]
+fn unc_file_arguments_are_rejected_before_permissions_or_file_access() {
+    use clap::Parser;
+    for path in [
+        r"\\server\share\image.png",
+        "//server/share/image.png",
+        r"\\?\UNC\server\share\image.png",
+        r"\\.\pipe\image",
+        r"\\?\GLOBALROOT\Device\image",
+        r"/\server\share\image",
+    ] {
+        let batch = crate::batch::parse_command(
+            serde_json::from_value(serde_json::json!({
+                "command": "clipboard-set", "args": {"image": path}
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+        assert!(
+            super::preflight(&batch, &agent_desktop_core::PermissionReport::default())
+                .unwrap_err()
+                .to_string()
+                .contains("UNC")
+        );
+        for args in [
+            vec!["clipboard-set", "--image", path],
+            vec!["clipboard-set", "--file-url", path],
+            vec![
+                "clipboard-set",
+                "--file-url",
+                "local.png",
+                "--file-url",
+                path,
+            ],
+            vec!["clipboard-get", "--out", path],
+            vec!["screenshot", path],
+            vec!["trace", "export", "--out", path],
+            vec!["cursor-overlay", "enable", "--image", path],
+            vec!["cursor-overlay", "enable", "--pointer-image", path],
+        ] {
+            let cli = crate::cli::Cli::try_parse_from(
+                std::iter::once("agent-desktop").chain(args.clone()),
+            )
+            .unwrap();
+            let error = super::preflight(
+                &cli.command.unwrap(),
+                &agent_desktop_core::PermissionReport::default(),
+            )
+            .expect_err(&format!("accepted {args:?}"));
+            assert_eq!(error.code(), "INVALID_ARGS", "{args:?}: {error}");
+            assert!(error.to_string().contains("UNC"), "{args:?}: {error}");
+        }
+    }
+}

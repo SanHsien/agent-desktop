@@ -194,16 +194,8 @@ fn is_absolute_launch_path(id: &str) -> bool {
     bytes.len() >= 3 && bytes[0].is_ascii_alphabetic() && bytes[1] == b':' && bytes[2] == b'\\'
 }
 
-/// True for any path outside the local drive namespace: UNC (`\\server\share`), `\\?\UNC\`, device
-/// namespaces such as `\\.\` and `\\?\GLOBALROOT\`, and their forward-slash spellings. Only `X:\` and
-/// `\\?\X:\` are local drive paths.
 pub(super) fn is_network_path(id: &str) -> bool {
-    let mut leading = id.chars();
-    let separator = |c: Option<char>| matches!(c, Some('\\' | '/'));
-    if !(separator(leading.next()) && separator(leading.next())) {
-        return false;
-    }
-    !is_absolute_launch_path(id)
+    agent_desktop_core::is_windows_network_path(id)
 }
 
 fn refuse_network_path(id: &str) -> Result<(), AdapterError> {

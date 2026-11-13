@@ -56,3 +56,37 @@ fn verbatim_local_drive_paths_remain_launch_identifiers() {
     assert!(launch_identifier(r"\\?\C:\Windows\notepad.exe").is_ok());
     assert!(launch_identifier(r"\\?\c:\Windows\notepad.exe").is_ok());
 }
+
+#[test]
+fn nt_unc_globalroot_and_device_launch_paths_are_refused_by_the_network_guard() {
+    for path in [
+        r"\??\UNC\server\share\app.exe",
+        r"\??\GLOBALROOT\Device\app.exe",
+        "/??/UNC/server/share/app.exe",
+        r"\??\pipe\app",
+        r"\??\C:relative.exe",
+    ] {
+        assert!(is_network_path(path), "{path}");
+        let error = refuse_network_path(path).expect_err(path);
+        assert_eq!(error.code, ErrorCode::InvalidArgs);
+        assert!(error.message.contains("NetNTLM"));
+        assert!(error.suggestion.is_some());
+        assert!(
+            launch_identifier(path)
+                .unwrap_err()
+                .message
+                .contains("NetNTLM")
+        );
+        assert!(
+            resolve_executable(path)
+                .unwrap_err()
+                .message
+                .contains("NetNTLM")
+        );
+    }
+}
+
+#[test]
+fn nt_absolute_drive_launch_paths_are_not_network_paths() {
+    assert!(!is_network_path(r"\??\C:\Windows\notepad.exe"));
+}

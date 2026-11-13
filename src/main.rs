@@ -156,6 +156,15 @@ fn execute_with_deadline(
     if let Some(deadline) = deadline.filter(|deadline| deadline.is_expired()) {
         return Err(pre_dispatch_error(deadline.timeout_error().into()));
     }
+    #[cfg(target_os = "windows")]
+    {
+        command_policy::file_path::validate_optional(cli.trace.as_deref())
+            .map_err(pre_dispatch_error)?;
+        command_policy::file_path::validate_optional(cli.visual_debug.screenshot.as_deref())
+            .map_err(pre_dispatch_error)?;
+        // Reject before context and adapter setup; preflight also guards batch entries.
+        command_policy::file_path::validate_command(&cmd).map_err(pre_dispatch_error)?;
+    }
     cli.visual_debug.validate(&cmd)?;
     agent_desktop_core::validate_state_root_env().map_err(pre_dispatch_error)?;
     match cmd {

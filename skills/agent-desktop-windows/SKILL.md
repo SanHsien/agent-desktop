@@ -78,6 +78,17 @@ observation, actions and capture there fail or return nothing.
   `INVALID_ARGS`, for the program and for `--cwd`, because opening it sends the
   user's NetNTLM credentials to the remote host. Pass `--cwd` only with a
   directory you trust: it decides which DLLs the new process loads first.
+- **NT path prefixes allow only absolute drive paths.** After `\??\` or
+  `/??/`, only a drive-letter path such as `C:\images\image.png` passes the
+  network guard. UNC, GLOBALROOT, and other device names are refused.
+- **File path arguments refuse network and device paths before file access.**
+  This applies to `screenshot PATH`, `clipboard-get --out`,
+  `clipboard-set --image` and every `--file-url`,
+  `cursor-overlay enable --image` and `--pointer-image`, `trace export --out`,
+  global `--trace`, and `--debug --screenshot`, including supported batch items.
+  Forward and mixed separators are checked too. Relative paths, local drive
+  paths and extended drive paths (`\\?\C:\...`) remain supported. This check
+  does not resolve the destination of local links or mapped drives.
 - **Notifications:** `list-notifications` with the Action Center closed needs
   `--headed`. Single-item `dismiss-notification` and `notification-action` need
   `--headed` and `--expected-app` or `--expected-title` for the entry at INDEX.

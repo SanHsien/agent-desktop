@@ -1,3 +1,6 @@
+#[cfg(target_os = "windows")]
+pub(crate) mod file_path;
+
 use agent_desktop_core::{
     AdapterError, AppError, DeliverySemantics, ErrorCode, PermissionReport, refs::validate_ref_id,
 };
@@ -80,6 +83,8 @@ pub(crate) fn policy_for(cmd: &Commands) -> PermissionNeed {
 }
 
 pub(crate) fn preflight(cmd: &Commands, report: &PermissionReport) -> Result<(), AppError> {
+    #[cfg(target_os = "windows")]
+    file_path::validate_command(cmd)?;
     crate::mcp::restrictions::enforce(cmd)?;
     validate_args(cmd)?;
     let permission = policy_for(cmd);

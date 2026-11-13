@@ -16,6 +16,7 @@ pub mod session;
 pub mod snapshot;
 mod storage;
 pub mod system;
+pub use system::windows_path::is_windows_network_path;
 pub mod trace;
 pub mod tree;
 mod wait;
