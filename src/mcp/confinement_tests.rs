@@ -42,10 +42,9 @@ fn existing_root(tag: &str) -> PathBuf {
 fn inspector_environment_variables_need_the_cdp_opt_in() {
     for entry in [
         "NODE_OPTIONS=--inspect=9229",
-        "node_options=--max-old-space-size=1",
+        "node_options=--inspect-port=0",
         "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=9222",
         "Webview2_Additional_Browser_Arguments=--x",
-        "ELECTRON_RUN_AS_NODE=1",
         "electron_enable_logging=1",
         "JAVA_TOOL_OPTIONS=-agentlib:jdwp=transport=dt_socket,server=y,address=5005",
         "_java_options=-Xmx1g",

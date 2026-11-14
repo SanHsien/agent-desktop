@@ -24,10 +24,34 @@ const INSPECTOR_ENV_KEYS: [&str; 5] = [
     "JDK_JAVA_OPTIONS",
 ];
 const ELECTRON_ENV_PREFIX: &str = "ELECTRON_";
+/// Node's long options that preload a module, install a loader or load OpenSSL engines through a config file, in the
+/// dash spelling Node folds `_` into.
+const MODULE_LOADING_FLAGS: &[&str] = &[
+    "--require",
+    "--import",
+    "--loader",
+    "--experimental-loader",
+    "--openssl-config",
+    "--snapshot-blob",
+];
+/// The only options `NODE_OPTIONS` may carry for an MCP client: inspector endpoints, which `--allow-cdp` governs.
+const NODE_ENDPOINT_OPTIONS: &[&str] = &[
+    "--inspect",
+    "--inspect-brk",
+    "--inspect-port",
+    "--inspect-wait",
+    "--debug-port",
+];
+/// Node's short preload option. Node matches it case-sensitively and only with a separate value.
+const SHORT_REQUIRE_FLAG: &str = "-r";
 /// Variables that decide which program, DLL, module or helper a new process finds or loads, or that name a program
 /// the process runs on its own (an SSH, askpass, editor or pager helper, a Git config injection). Refused for MCP
 /// clients under every opt-in, because none of them is needed to drive a managed app.
 const CODE_LOADING_ENV_KEYS: &[&str] = &[
+    "ELECTRON_RUN_AS_NODE",
+    "ELECTRON_NO_ASAR",
+    "ELECTRON_OVERRIDE_DIST_PATH",
+    "ELECTRON_TRASH",
     "PATH",
     "PATHEXT",
     "COMSPEC",
@@ -46,6 +70,9 @@ const CODE_LOADING_ENV_KEYS: &[&str] = &[
     "RUBYLIB",
     "RUBYOPT",
     "BASH_ENV",
+    "OPENSSL_CONF",
+    "OPENSSL_ENGINES",
+    "OPENSSL_MODULES",
     "GIT_SSH",
     "GIT_SSH_COMMAND",
     "GIT_EXEC_PATH",
@@ -68,10 +95,80 @@ const FORBIDDEN_NAME_CHARACTERS: [char; 7] = [':', '<', '>', '"', '|', '?', '*']
 
 /// True when `text` contains, in any letter case, a switch or option name that opens a DevTools or inspector
 /// endpoint. A substring scan, because a program such as `cmd /c start msedge --remote-debugging-port=9222` carries
-/// the switch inside one argument.
+/// the switch inside one argument. Option-shaped tokens are scanned again with `_` read as `-`, as Node reads them;
+/// variable names such as `APP_DEBUG_PORT` are not option-shaped and stay as written.
 pub(super) fn mentions_debug_endpoint(text: &str) -> bool {
     let lowered = text.to_ascii_lowercase();
     DEBUG_MARKERS.iter().any(|marker| lowered.contains(marker))
+        || lowered
+            .split(|ch: char| ch.is_whitespace() || matches!(ch, '\'' | '"'))
+            .map(option_part)
+            .filter(|option| option.starts_with('-'))
+            .any(|option| {
+                let dashed = option.replace('_', "-");
+                DEBUG_MARKERS.iter().any(|marker| dashed.contains(marker))
+            })
+}
+
+/// A token without the leading `KEY=` of an environment entry.
+fn option_part(token: &str) -> &str {
+    token
+        .split_once('=')
+        .filter(|(key, _)| !key.starts_with('-'))
+        .map_or(token, |(_, value)| value)
+}
+
+/// Finds module preloads and custom loaders before any endpoint opt-in. The text is read twice: split on whitespace
+/// and quotes, and the way Node reads `NODE_OPTIONS`, which drops quotes and undoes backslash escapes, so a quote or
+/// escape spliced into an option name does not hide it.
+pub(super) fn mentions_code_loading(text: &str) -> bool {
+    let node_reading: String = text
+        .chars()
+        .filter(|ch| !matches!(ch, '"' | '\'' | '\\'))
+        .collect();
+    text.split(|ch: char| ch.is_whitespace() || matches!(ch, '\'' | '"'))
+        .chain(node_reading.split(char::is_whitespace))
+        .any(is_module_loading_option)
+}
+
+/// One token: a leading `KEY=` of an environment entry is skipped, long names ignore letter case and treat `_` as `-`
+/// as Node does, and `-r` must match exactly.
+fn is_module_loading_option(token: &str) -> bool {
+    let option = option_part(token);
+    if option == SHORT_REQUIRE_FLAG {
+        return true;
+    }
+    if !option.starts_with("--") {
+        return false;
+    }
+    let name = option
+        .split('=')
+        .next()
+        .unwrap_or_default()
+        .to_ascii_lowercase()
+        .replace('_', "-");
+    MODULE_LOADING_FLAGS.contains(&name.as_str())
+}
+
+/// True when every option in a `NODE_OPTIONS` value is an inspector endpoint. An allow list, because Node keeps adding
+/// options that load or run code (`--snapshot-blob` replaces the main script), and a deny list trails behind them.
+pub(super) fn node_options_hold_only_endpoints(value: &str) -> bool {
+    let node_reading: String = value
+        .chars()
+        .filter(|ch| !matches!(ch, '"' | '\'' | '\\'))
+        .collect();
+    node_reading
+        .split(char::is_whitespace)
+        .filter(|token| token.starts_with('-'))
+        .all(|token| {
+            let name = token
+                .split('=')
+                .next()
+                .unwrap_or_default()
+                .to_ascii_lowercase()
+                .replace('_', "-");
+            NODE_ENDPOINT_OPTIONS.contains(&name.as_str())
+        })
 }
 
 /// The variable name of a `KEY=VALUE` launch environment entry.
@@ -223,3 +320,7 @@ mod tests;
 #[cfg(test)]
 #[path = "confinement_env_tests.rs"]
 mod env_tests;
+
+#[cfg(test)]
+#[path = "confinement_node_options_tests.rs"]
+mod node_options_tests;

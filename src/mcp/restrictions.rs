@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 
 use super::confinement::{
     env_key, has_non_ascii_name, is_code_loading_env_key, is_inside, is_inspector_env_key,
-    mentions_debug_endpoint,
+    mentions_code_loading, mentions_debug_endpoint, node_options_hold_only_endpoints,
 };
 use crate::cli::Commands;
 use crate::cli_args::{
@@ -171,6 +171,31 @@ impl Restrictions {
                     env_key(entry)
                 ),
                 "Omit that variable; the app starts with the server's own search path.",
+            ));
+        }
+        if args
+            .args
+            .iter()
+            .chain(args.env.iter())
+            .any(|text| mentions_code_loading(text))
+        {
+            return Err(denied(
+                "launch module-loading arguments are not available to MCP clients, even with --allow-cdp",
+                "Omit require, import and loader arguments; cdp only permits debugging endpoints.",
+            ));
+        }
+        if let Some(entry) = args.env.iter().find(|entry| {
+            env_key(entry).eq_ignore_ascii_case("NODE_OPTIONS")
+                && !node_options_hold_only_endpoints(
+                    entry.split_once('=').map_or("", |(_, value)| value),
+                )
+        }) {
+            return Err(denied(
+                format!(
+                    "launch --env {} is not available to MCP clients: NODE_OPTIONS may carry only inspector endpoint options, even with --allow-cdp",
+                    env_key(entry)
+                ),
+                "Keep only --inspect, --inspect-brk, --inspect-port, --inspect-wait or --debug-port in NODE_OPTIONS.",
             ));
         }
         if self.cdp {

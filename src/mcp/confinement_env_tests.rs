@@ -26,6 +26,124 @@ fn denied_code(result: Result<(), AppError>) -> ErrorCode {
         other => panic!("unexpected error kind: {other}"),
     }
 }
+
+fn assert_launch_refused_with_and_without_cdp(args: Vec<String>, env: Vec<String>) {
+    let launch = crate::batch::parse_command(
+        serde_json::from_value(json!({
+            "command": "launch", "args": { "app": "app", "args": args, "env": env }
+        }))
+        .expect("a batch entry"),
+    )
+    .expect("the entry decodes");
+    for limits in [launch_only(), Restrictions::all_allowed()] {
+        assert_eq!(denied_code(limits.check(&launch)), ErrorCode::PolicyDenied);
+    }
+}
+
+#[test]
+fn node_module_loading_arguments_are_refused_even_with_cdp() {
+    for flag in ["--require", "--import", "--loader", "--experimental-loader"] {
+        for spelling in [flag.to_owned(), flag.to_ascii_uppercase()] {
+            for args in [
+                vec![format!("{spelling}=module.js")],
+                vec![spelling.clone(), "module.js".to_owned()],
+                vec![format!(" \t{spelling} module.js \t")],
+                vec![format!("/c node {spelling}=module.js")],
+            ] {
+                assert_launch_refused_with_and_without_cdp(args, vec![]);
+            }
+        }
+    }
+    let launch = command(&["launch", "app", "--arg=-r", "--arg=module.js"]);
+    assert_eq!(
+        denied_code(Restrictions::all_allowed().check(&launch)),
+        ErrorCode::PolicyDenied
+    );
+    assert_launch_refused_with_and_without_cdp(vec!["-r".into(), "module.js".into()], vec![]);
+}
+
+#[test]
+fn node_options_module_loading_is_refused_even_with_cdp() {
+    for flag in ["--require", "--import", "--loader", "--experimental-loader"] {
+        for spelling in [flag.to_owned(), flag.to_ascii_uppercase()] {
+            for value in [
+                format!("{spelling}=module.js"),
+                format!("{spelling} module.js"),
+                format!("  --inspect=9229 \t{spelling} = module.js  "),
+                format!("\"{spelling}=module.js\""),
+            ] {
+                let entry = format!("  nOdE_oPtIoNs = {value}  ");
+                let direct = command(&["launch", "app", &format!("--env={entry}")]);
+                assert_eq!(
+                    denied_code(Restrictions::all_allowed().check(&direct)),
+                    ErrorCode::PolicyDenied,
+                    "{entry}"
+                );
+                assert_launch_refused_with_and_without_cdp(vec![], vec![entry]);
+            }
+        }
+    }
+    assert_launch_refused_with_and_without_cdp(vec![], vec!["NODE_OPTIONS=-r module.js".into()]);
+}
+
+#[test]
+fn electron_code_loading_and_target_variables_are_refused_even_with_cdp() {
+    for key in [
+        "ELECTRON_RUN_AS_NODE",
+        "ELECTRON_NO_ASAR",
+        "ELECTRON_OVERRIDE_DIST_PATH",
+        "ELECTRON_TRASH",
+    ] {
+        for spelling in [key.to_owned(), key.to_ascii_lowercase()] {
+            for value in ["1", "0", "", "C:\\module"] {
+                let entry = format!("  {spelling} = {value} ");
+                let direct = command(&["launch", "app", &format!("--env={entry}")]);
+                assert_eq!(
+                    denied_code(Restrictions::all_allowed().check(&direct)),
+                    ErrorCode::PolicyDenied,
+                    "{entry}"
+                );
+                assert_launch_refused_with_and_without_cdp(vec![], vec![entry]);
+            }
+        }
+    }
+}
+
+#[test]
+fn inspect_endpoints_still_require_cdp_but_do_not_count_as_module_loading() {
+    for flag in [
+        "--inspect",
+        "--inspect-brk",
+        "--inspect-port",
+        "--inspect-wait",
+    ] {
+        for source in ["arg", "env"] {
+            let option = if source == "arg" {
+                format!("--arg=  {}=9229  ", flag.to_ascii_uppercase())
+            } else {
+                format!("--env= node_options =  {flag}=9229  ")
+            };
+            let launch = command(&["launch", "app", &option]);
+            assert_eq!(
+                denied_code(launch_only().check(&launch)),
+                ErrorCode::PolicyDenied
+            );
+            assert!(Restrictions::all_allowed().check(&launch).is_ok());
+        }
+    }
+    for value in [
+        "--max-old-space-size=128",
+        "--requirement=note",
+        "--import-map=note",
+    ] {
+        let launch = command(&["launch", "app", &format!("--env=NODE_OPTIONS={value}")]);
+        assert_eq!(
+            denied_code(Restrictions::all_allowed().check(&launch)),
+            ErrorCode::PolicyDenied,
+            "{value}"
+        );
+    }
+}
 #[test]
 fn code_loading_variables_are_refused_even_with_every_opt_in() {
     let everything = Restrictions::all_allowed();
@@ -56,6 +174,9 @@ fn code_loading_variables_are_refused_even_with_every_opt_in() {
         "GIT_PROXY_COMMAND=review.exe",
         "GIT_EXTERNAL_DIFF=review.exe",
         "GIT_CONFIG_COUNT=1",
+        "OPENSSL_CONF=C:\review.cnf",
+        "openssl_engines=C:\review",
+        "OPENSSL_MODULES=C:\review",
         "GIT_CONFIG_KEY_0=core.sshCommand",
         "GIT_CONFIG_VALUE_0=review.exe",
         "GIT_CONFIG_PARAMETERS='core.pager=review.exe'",
@@ -144,5 +265,128 @@ fn firefox_debugger_server_switch_needs_the_cdp_opt_in_in_every_spelling() {
             ..launch_only()
         };
         assert!(with_cdp.check(&launch).is_ok(), "{args:?}");
+    }
+}
+
+#[test]
+fn chromium_single_dash_switches_are_not_module_loading_arguments() {
+    for value in [
+        "-remote-debugging-port=9222",
+        "-remote-debugging-pipe",
+        "-remote-allow-origins=*",
+        "-renderer-process-limit=2",
+        "/c chrome -remote-debugging-port=9222 -remote-allow-origins=*",
+    ] {
+        assert!(!super::mentions_code_loading(value), "{value}");
+        let launch = command(&["launch", "app", &format!("--arg={value}")]);
+        assert!(
+            Restrictions::all_allowed().check(&launch).is_ok(),
+            "{value}"
+        );
+        let batch = crate::batch::parse_command(
+            serde_json::from_value(json!({
+                "command": "launch", "args": { "app": "app", "args": [value] }
+            }))
+            .expect("a batch entry"),
+        )
+        .expect("the entry decodes");
+        assert!(Restrictions::all_allowed().check(&batch).is_ok(), "{value}");
+        assert_launch_refused_with_and_without_cdp(
+            vec![value.into(), "-r".into(), "module.js".into()],
+            vec![],
+        );
+    }
+}
+
+#[test]
+fn node_rejected_attached_short_require_values_are_not_module_loading() {
+    for value in ["-rmodule.js", "-r=module.js"] {
+        assert!(!super::mentions_code_loading(value), "{value}");
+        let launch = command(&["launch", "app", &format!("--arg={value}")]);
+        assert!(
+            Restrictions::all_allowed().check(&launch).is_ok(),
+            "{value}"
+        );
+        let entry = format!("NODE_OPTIONS={value}");
+        let launch = command(&["launch", "app", &format!("--env={entry}")]);
+        assert_eq!(
+            denied_code(Restrictions::all_allowed().check(&launch)),
+            ErrorCode::PolicyDenied,
+            "{entry}"
+        );
+    }
+}
+
+#[test]
+fn electron_install_target_variables_are_not_runtime_code_loading() {
+    for key in ["ELECTRON_INSTALL_PLATFORM", "ELECTRON_INSTALL_ARCH"] {
+        for spelling in [key.to_owned(), key.to_ascii_lowercase()] {
+            assert!(!super::is_code_loading_env_key(&spelling), "{spelling}");
+            let entry = format!("  {spelling} = arm64 ");
+            let launch = command(&["launch", "app", &format!("--env={entry}")]);
+            assert!(
+                Restrictions::all_allowed().check(&launch).is_ok(),
+                "{entry}"
+            );
+            assert_eq!(
+                denied_code(launch_only().check(&launch)),
+                ErrorCode::PolicyDenied
+            );
+        }
+    }
+}
+
+#[test]
+fn underscore_spellings_of_loader_options_are_refused_like_dashes() {
+    for value in [
+        "--experimental_loader=./m.js",
+        "--experimental_loader ./m.js",
+    ] {
+        assert!(super::mentions_code_loading(value), "{value}");
+        assert_launch_refused_with_and_without_cdp(vec![value.to_owned()], vec![]);
+        assert_launch_refused_with_and_without_cdp(vec![], vec![format!("NODE_OPTIONS={value}")]);
+    }
+}
+
+#[test]
+fn quotes_and_escapes_spliced_into_node_options_are_refused() {
+    for value in [
+        r#"--re""quire=./m.js"#,
+        r#""--req\uire" ./m.js"#,
+        r#"-""r ./m.js"#,
+    ] {
+        assert!(super::mentions_code_loading(value), "{value}");
+        assert_launch_refused_with_and_without_cdp(vec![], vec![format!("NODE_OPTIONS={value}")]);
+    }
+}
+
+#[test]
+fn uppercase_short_r_is_not_module_loading_because_node_options_are_case_sensitive() {
+    for value in ["-R", "LESS=-R", "grep -R pattern ."] {
+        assert!(!super::mentions_code_loading(value), "{value}");
+    }
+    let plain = command(&["launch", "app", "--arg=-R", "--env=LESS=-R"]);
+    assert!(Restrictions::all_allowed().check(&plain).is_ok());
+}
+
+#[test]
+fn openssl_config_is_refused_because_it_loads_engines() {
+    for value in ["--openssl-config=./o.cnf", "--openssl_config ./o.cnf"] {
+        assert!(super::mentions_code_loading(value), "{value}");
+        assert_launch_refused_with_and_without_cdp(vec![], vec![format!("NODE_OPTIONS={value}")]);
+    }
+}
+
+#[test]
+fn underscore_spellings_of_debug_options_need_the_cdp_opt_in() {
+    for value in ["--debug_port=9229", "--remote_debugging_port=9222"] {
+        assert!(super::mentions_debug_endpoint(value), "{value}");
+        assert!(
+            super::mentions_debug_endpoint(&format!("NODE_OPTIONS={value}")),
+            "{value}"
+        );
+    }
+    for entry in ["APP_DEBUG_PORT=1", "MY_REMOTE_DEBUGGING=0"] {
+        assert!(!super::mentions_debug_endpoint(entry), "{entry}");
     }
 }
