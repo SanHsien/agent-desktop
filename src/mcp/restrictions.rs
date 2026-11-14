@@ -7,8 +7,8 @@ use agent_desktop_core::{AdapterError, AppError, DeliverySemantics, ErrorCode};
 use std::path::{Path, PathBuf};
 
 use super::confinement::{
-    env_key, has_non_ascii_name, is_code_loading_env_key, is_inside, is_inspector_env_key,
-    mentions_code_loading, mentions_debug_endpoint, node_options_hold_only_endpoints,
+    env_key, has_non_ascii_name, inspector_env_value_is_endpoint_only, is_code_loading_env_key,
+    is_inside, is_inspector_env_key, mentions_code_loading, mentions_debug_endpoint,
 };
 use crate::cli::Commands;
 use crate::cli_args::{
@@ -185,17 +185,17 @@ impl Restrictions {
             ));
         }
         if let Some(entry) = args.env.iter().find(|entry| {
-            env_key(entry).eq_ignore_ascii_case("NODE_OPTIONS")
-                && !node_options_hold_only_endpoints(
-                    entry.split_once('=').map_or("", |(_, value)| value),
-                )
+            !inspector_env_value_is_endpoint_only(
+                env_key(entry),
+                entry.split_once('=').map_or("", |(_, value)| value),
+            )
         }) {
             return Err(denied(
                 format!(
-                    "launch --env {} is not available to MCP clients: NODE_OPTIONS may carry only inspector endpoint options, even with --allow-cdp",
+                    "launch --env {} is not available to MCP clients: it may carry only debugging endpoint options, even with --allow-cdp",
                     env_key(entry)
                 ),
-                "Keep only --inspect, --inspect-brk, --inspect-port, --inspect-wait or --debug-port in NODE_OPTIONS.",
+                "NODE_OPTIONS: only --inspect, --inspect-brk, --inspect-port, --inspect-wait or --debug-port; WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: only --remote-debugging-port or --remote-allow-origins; the Java option variables: only -agentlib:jdwp= with transport=dt_socket or dt_shmem and endpoint sub-options.",
             ));
         }
         if self.cdp {
@@ -214,7 +214,7 @@ impl Restrictions {
             || texts.into_iter().any(mentions_debug_endpoint);
         self.require(
             !opens_endpoint,
-            "launch with a DevTools or inspector endpoint (cdp, remote-debugging, inspect, marionette, NODE_OPTIONS, ELECTRON_*)",
+            "launch with a DevTools or inspector endpoint (cdp, remote-debugging, inspect, marionette, NODE_OPTIONS, WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS, Java option variables, ELECTRON_*)",
             "--allow-cdp",
         )
     }

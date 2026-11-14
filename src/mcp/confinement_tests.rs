@@ -44,11 +44,11 @@ fn inspector_environment_variables_need_the_cdp_opt_in() {
         "NODE_OPTIONS=--inspect=9229",
         "node_options=--inspect-port=0",
         "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=9222",
-        "Webview2_Additional_Browser_Arguments=--x",
+        "Webview2_Additional_Browser_Arguments=--remote-allow-origins=*",
         "electron_enable_logging=1",
         "JAVA_TOOL_OPTIONS=-agentlib:jdwp=transport=dt_socket,server=y,address=5005",
-        "_java_options=-Xmx1g",
-        "Jdk_Java_Options=-Xmx1g",
+        "_java_options=-agentlib:jdwp=transport=dt_socket,server=y",
+        "Jdk_Java_Options=-agentlib:jdwp=transport=dt_socket,address=5005",
     ] {
         let env = format!("--env={entry}");
         let launch = command(&["launch", "app", &env]);

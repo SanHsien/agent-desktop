@@ -16,12 +16,14 @@ const DEBUG_MARKERS: [&str; 10] = [
     "debug-port",
     "debug-brk",
 ];
-const INSPECTOR_ENV_KEYS: [&str; 5] = [
+const INSPECTOR_ENV_KEYS: [&str; 7] = [
     "NODE_OPTIONS",
     "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS",
     "JAVA_TOOL_OPTIONS",
     "_JAVA_OPTIONS",
     "JDK_JAVA_OPTIONS",
+    "IBM_JAVA_OPTIONS",
+    "OPENJ9_JAVA_OPTIONS",
 ];
 const ELECTRON_ENV_PREFIX: &str = "ELECTRON_";
 /// Node's long options that preload a module, install a loader or load OpenSSL engines through a config file, in the
@@ -42,6 +44,8 @@ const NODE_ENDPOINT_OPTIONS: &[&str] = &[
     "--inspect-wait",
     "--debug-port",
 ];
+/// JVM options that load a Java or native agent, refused wherever they appear (wrapper variables such as `JAVA_OPTS`).
+const JAVA_AGENT_OPTIONS: &[&str] = &["-javaagent:", "-agentpath:"];
 /// Node's short preload option. Node matches it case-sensitively and only with a separate value.
 const SHORT_REQUIRE_FLAG: &str = "-r";
 /// Variables that decide which program, DLL, module or helper a new process finds or loads, or that name a program
@@ -71,6 +75,8 @@ const CODE_LOADING_ENV_KEYS: &[&str] = &[
     "RUBYOPT",
     "BASH_ENV",
     "OPENSSL_CONF",
+    "WEBVIEW2_BROWSER_EXECUTABLE_FOLDER",
+    "JAVA_HOME",
     "OPENSSL_ENGINES",
     "OPENSSL_MODULES",
     "GIT_SSH",
@@ -136,6 +142,13 @@ pub(super) fn mentions_code_loading(text: &str) -> bool {
 fn is_module_loading_option(token: &str) -> bool {
     let option = option_part(token);
     if option == SHORT_REQUIRE_FLAG {
+        return true;
+    }
+    let lower = option.to_ascii_lowercase();
+    if JAVA_AGENT_OPTIONS
+        .iter()
+        .any(|prefix| lower.starts_with(prefix))
+    {
         return true;
     }
     if !option.starts_with("--") {
@@ -313,6 +326,10 @@ fn is_device_stem(upper: &str) -> bool {
     })
 }
 
+#[path = "confinement_endpoint_env.rs"]
+mod endpoint_env;
+pub(super) use endpoint_env::inspector_env_value_is_endpoint_only;
+
 #[cfg(test)]
 #[path = "confinement_tests.rs"]
 mod tests;
@@ -324,3 +341,7 @@ mod env_tests;
 #[cfg(test)]
 #[path = "confinement_node_options_tests.rs"]
 mod node_options_tests;
+
+#[cfg(test)]
+#[path = "confinement_endpoint_env_tests.rs"]
+mod endpoint_env_tests;

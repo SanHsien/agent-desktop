@@ -94,6 +94,8 @@ Git 產品差異清單 + 表格
 | `src/mcp/confinement_tests.rs` | 新檔：confinement 的測試，含環境變數、嵌入式開關、PATH 類變數、close-app force、裝置名與不存在的輸出目錄、懸空 junction 與以 junction 命名的輸出檔 | 隨 `src/mcp/confinement.rs` 移除 |
 | `src/mcp/confinement_env_tests.rs` | 新檔：launch 環境變數（程式載入、profiler、Git 設定注入）與 Firefox debugger 參數的測試，先紅後綠，含誤擋邊界 | 隨 `src/mcp/confinement.rs` 移除 |
 | `src/mcp/confinement_node_options_tests.rs` | 新檔：`NODE_OPTIONS` 只准 inspector 端點選項的白名單，與 `--snapshot-blob` 等會取代主程式的 Node 選項，先紅後綠 | 隨 `src/mcp/confinement.rs` 移除 |
+| `src/mcp/confinement_endpoint_env.rs` | 新檔：`NODE_OPTIONS`、`WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS` 與 Java／OpenJ9 選項變數在 `--allow-cdp` 下只准偵錯端點的值檢查（含 JDWP 子選項白名單）；自 `confinement.rs` 拆出以守每檔行數上限 | 隨 `src/mcp/confinement.rs` 移除 |
+| `src/mcp/confinement_endpoint_env_tests.rs` | 新檔：`WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS` 與 Java／OpenJ9 選項變數只准偵錯端點的白名單（含 JDWP 子選項），以及執行環境位置變數的封鎖，先紅後綠 | 隨 `src/mcp/confinement.rs` 移除 |
 | `src/mcp/exposure.rs` | 新檔：決定哪些工具與參數在某組限制下公開、哪些參數是檔案路徑、相對路徑如何改寫（`catalog.rs` 已接近 400 行） | 隨 `src/mcp/catalog.rs` 取回上游而移除 |
 | `src/mcp/exposure_tests.rs` | 新檔：公開範圍與路徑改寫測試 | 隨 `src/mcp/exposure.rs` 移除 |
 | `src/mcp/mod.rs` | `mcp` 子命令加四個 `--allow-*` 旗標；`serve` 解析限制並傳給子行程，session 不存在時拒絕 `--allow-file-write`；INSTRUCTIONS 說明預設關閉與「不是沙盒」；`Server` 改持有 `ChildSetup` | 上游 MCP 伺服器提供等效旗標與說明，或取回上游版本 |
