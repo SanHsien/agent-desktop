@@ -164,12 +164,6 @@ fn not_delivered(error: AdapterError) -> AdapterError {
 }
 
 #[cfg(test)]
-pub(crate) fn open_clipboard_raw(owner: Option<HWND>) -> bool {
-    let hwnd = owner.unwrap_or(std::ptr::null_mut());
-    unsafe { OpenClipboard(hwnd) != 0 }
-}
-
-#[cfg(test)]
 pub(crate) fn close_clipboard_raw() {
     unsafe {
         let _ = CloseClipboard();

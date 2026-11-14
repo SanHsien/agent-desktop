@@ -45,7 +45,7 @@ fn contending_holder_is_a_second_process_that_blocks_open() {
     );
     holder.release().expect("holder releases on request");
     assert!(
-        try_open_clipboard(None),
+        open_clipboard_once_free(None),
         "OpenClipboard must succeed after the holder releases"
     );
     close_clipboard();
@@ -62,4 +62,60 @@ fn delayed_owner_clears_delay_format_on_drop() {
         !unsafe { windows_sys::Win32::System::DataExchange::IsClipboardFormatAvailable(13) != 0 },
         "dropping the delayed owner must clear the advertised delay-rendered format"
     );
+}
+
+/// The release a caller waits for is the clipboard coming free. A host whose
+/// process outlives that moment must not turn a completed release into a
+/// failure: under CPU load the OS was measured taking from seconds to over a
+/// minute to finish tearing a host down after it had closed the clipboard.
+#[test]
+fn a_holder_whose_process_outlives_its_release_still_reports_the_release() {
+    let _lock = clipboard_test_lock();
+    let mut holder = ContendingClipboardHolder::spawn_lingering(Duration::from_secs(20))
+        .expect("the lingering holder starts");
+    assert!(
+        !try_open_clipboard(None),
+        "OpenClipboard must fail while the holder keeps the clipboard open"
+    );
+    holder
+        .release()
+        .expect("the clipboard coming free is the release, whatever the host process does next");
+    assert!(
+        open_clipboard_once_free(None),
+        "OpenClipboard must succeed once the holder has let go, while its process is still alive"
+    );
+    close_clipboard();
+}
+
+/// Clipboard listeners on a real desktop (history, remote-session sync) open
+/// the clipboard for a moment after every write, so an open that needs the
+/// clipboard has to outwait one instead of failing on a single attempt.
+#[test]
+fn an_open_that_needs_the_clipboard_outwaits_a_transient_opener() {
+    let _lock = clipboard_test_lock();
+    let (opened, wait_opened) = channel();
+    let opener = spawn(move || {
+        let window = message_only_window();
+        let held = !window.is_null() && open_clipboard_once_free(Some(window as isize));
+        let _ = opened.send(held);
+        std::thread::sleep(Duration::from_millis(300));
+        if held {
+            close_clipboard();
+        }
+        unsafe { DestroyWindow(window) };
+    });
+    assert!(
+        wait_opened.recv().expect("the opener reports"),
+        "the transient opener takes the clipboard"
+    );
+    assert!(
+        !try_open_clipboard(None),
+        "a single attempt loses to the opener, which is what makes the wait necessary"
+    );
+    assert!(
+        open_clipboard_once_free(None),
+        "the open must succeed once the transient opener lets go"
+    );
+    close_clipboard();
+    opener.join().expect("the opener thread ends");
 }

@@ -1,10 +1,12 @@
 use super::{
     ClipboardSession, OPEN_CLIPBOARD_RETRY_ATTEMPTS, OPEN_CLIPBOARD_RETRY_INTERVAL_MS,
-    close_clipboard_raw, open_clipboard_raw, owner_hwnd,
+    close_clipboard_raw, owner_hwnd,
 };
 use crate::input::clipboard::clipboard_guard::MoveableMemory;
 use crate::system::window::window_ops::list_windows_live;
-use crate::tree::fixture::fixture_clipboard::{ContendingClipboardHolder, clipboard_test_lock};
+use crate::tree::fixture::fixture_clipboard::{
+    ContendingClipboardHolder, clipboard_test_lock, open_clipboard_once_free,
+};
 use agent_desktop_core::{Deadline, ErrorCode, WindowFilter};
 use std::time::{Duration, Instant};
 use windows_sys::Win32::Foundation::GlobalFree;
@@ -39,7 +41,7 @@ fn hidden_owner_window_never_appears_in_list_windows() {
 fn write_open_uses_hidden_owner_while_null_owner_leaves_ownership_unset() {
     let _lock = clipboard_test_lock();
     assert!(
-        open_clipboard_raw(None),
+        open_clipboard_once_free(None),
         "OpenClipboard(NULL) must succeed for the negative control"
     );
     assert_ne!(unsafe { EmptyClipboard() }, 0);

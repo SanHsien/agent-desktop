@@ -25,7 +25,9 @@ const HOST_ENVIRONMENT_FLAG: &str = "AGENT_DESKTOP_CLIPBOARD_HOLDER_HOST";
 const HOST_TEST_NAME: &str =
     "tree::fixture::fixture_clipboard::tests::clipboard_holder_host_process_entry";
 const READY_PREFIX: &str = "AGENT_DESKTOP_CLIPBOARD_HOLDER_READY";
+const LINGER_ENVIRONMENT_FLAG: &str = "AGENT_DESKTOP_CLIPBOARD_HOLDER_LINGER_MS";
 const READY_TIMEOUT: Duration = Duration::from_secs(30);
+const RELEASE_PATIENCE: Duration = Duration::from_secs(30);
 const STALL_POLL: Duration = Duration::from_millis(25);
 const OPEN_CLIPBOARD_PATIENCE: Duration = Duration::from_secs(10);
 const OPEN_CLIPBOARD_POLL: Duration = Duration::from_millis(10);
@@ -102,24 +104,42 @@ impl Drop for DelayedClipboardOwner {
 /// Second-process holder that keeps `OpenClipboard` until released.
 pub(crate) struct ContendingClipboardHolder {
     child: Option<Child>,
+    window: isize,
 }
 
 impl ContendingClipboardHolder {
     pub(crate) fn spawn() -> Result<Self, String> {
+        Self::spawn_lingering(Duration::ZERO)
+    }
+
+    /// A holder whose process stays alive for `linger` after it has let the
+    /// clipboard go - a host whose teardown the OS is slow to finish.
+    pub(crate) fn spawn_lingering(linger: Duration) -> Result<Self, String> {
         let executable = std::env::current_exe().map_err(|error| error.to_string())?;
         let mut command = Command::new(executable);
         command
             .args(["--exact", HOST_TEST_NAME, "--ignored", "--nocapture"])
             .env(HOST_ENVIRONMENT_FLAG, "1")
+            .env(LINGER_ENVIRONMENT_FLAG, linger.as_millis().to_string())
             .stdin(Stdio::piped());
-        let (child, _, _reader) = fixture_spawn::spawn_host(
+        let (mut child, _, _reader) = fixture_spawn::spawn_host(
             command,
             fixture_spawn::first_line(|line| (line == READY_PREFIX).then_some(true)),
             |ready| *ready,
             "the clipboard holder exposed no stdout",
             "the clipboard holder never reported readiness",
         )?;
-        Ok(Self { child: Some(child) })
+        let window = unsafe { GetOpenClipboardWindow() as isize };
+        if window == 0 {
+            fixture_spawn::kill_and_wait(&mut child);
+            return Err(String::from(
+                "the clipboard holder reported readiness without holding the clipboard",
+            ));
+        }
+        Ok(Self {
+            child: Some(child),
+            window,
+        })
     }
 
     pub(crate) fn process_id(&self) -> u32 {
@@ -130,52 +150,52 @@ impl ContendingClipboardHolder {
         unsafe { GetOpenClipboardWindow() as isize }
     }
 
+    /// Returns once the holder's window no longer has the clipboard open.
+    ///
+    /// The release is the clipboard coming free, not the host process ending:
+    /// under CPU load the host was measured closing the clipboard within
+    /// milliseconds of the request while the OS took from seconds to over a
+    /// minute to finish tearing the process down, so waiting on the exit
+    /// turned a completed release into a failure.
     pub(crate) fn release(&mut self) -> Result<(), String> {
         let Some(mut child) = self.child.take() else {
             return Ok(());
         };
-        request_holder_release(&mut child);
-        await_holder_exit(&mut child)
+        if let Some(mut stdin) = child.stdin.take() {
+            let _ = stdin.write_all(b"release\n");
+            let _ = stdin.flush();
+        }
+        let released = await_clipboard_release(self.window);
+        let _ = child.kill();
+        released
     }
 }
 
 impl Drop for ContendingClipboardHolder {
     fn drop(&mut self) {
-        if let Some(mut child) = self.child.take() {
-            request_holder_release(&mut child);
-            let _ = await_holder_exit(&mut child);
-        }
+        let _ = self.release();
     }
 }
 
-fn request_holder_release(child: &mut Child) {
-    if let Some(mut stdin) = child.stdin.take() {
-        let _ = stdin.write_all(b"release\n");
-        let _ = stdin.flush();
+fn await_clipboard_release(window: isize) -> Result<(), String> {
+    let give_up = std::time::Instant::now() + RELEASE_PATIENCE;
+    while unsafe { GetOpenClipboardWindow() as isize } == window {
+        if std::time::Instant::now() >= give_up {
+            return Err(String::from(
+                "clipboard holder kept the clipboard open after release",
+            ));
+        }
+        std::thread::sleep(OPEN_CLIPBOARD_POLL);
     }
+    Ok(())
 }
 
-fn await_holder_exit(child: &mut Child) -> Result<(), String> {
-    let deadline = std::time::Instant::now() + Duration::from_secs(5);
-    loop {
-        match child.try_wait() {
-            Ok(Some(status)) if status.success() => return Ok(()),
-            Ok(Some(status)) => {
-                return Err(format!("clipboard holder exited unsuccessfully: {status}"));
-            }
-            Ok(None) if std::time::Instant::now() < deadline => {
-                std::thread::sleep(Duration::from_millis(25));
-            }
-            Ok(None) => {
-                fixture_spawn::kill_and_wait(child);
-                return Err(String::from("clipboard holder did not exit after release"));
-            }
-            Err(error) => {
-                fixture_spawn::kill_and_wait(child);
-                return Err(error.to_string());
-            }
-        }
-    }
+fn exit_linger() -> Duration {
+    std::env::var(LINGER_ENVIRONMENT_FLAG)
+        .ok()
+        .and_then(|millis| millis.parse().ok())
+        .map(Duration::from_millis)
+        .unwrap_or_default()
 }
 
 pub(crate) fn is_clipboard_holder_host() -> bool {
@@ -199,6 +219,16 @@ pub(crate) fn try_open_clipboard(owner: Option<isize>) -> bool {
         .map(|handle| handle as HWND)
         .unwrap_or(std::ptr::null_mut());
     unsafe { OpenClipboard(hwnd) != 0 }
+}
+
+/// `try_open_clipboard` for a caller that needs the clipboard rather than a
+/// verdict on whether it is held this instant: a transient opener is waited
+/// out, bounded the way the holder's own open is.
+pub(crate) fn open_clipboard_once_free(owner: Option<isize>) -> bool {
+    let hwnd = owner
+        .map(|handle| handle as HWND)
+        .unwrap_or(std::ptr::null_mut());
+    open_clipboard_when_free(hwnd).is_ok()
 }
 
 pub(crate) fn close_clipboard() {
@@ -247,6 +277,7 @@ fn hold_clipboard_until_release() -> Result<(), String> {
         let _ = CloseClipboard();
         DestroyWindow(window);
     }
+    std::thread::sleep(exit_linger());
     Ok(())
 }
 

@@ -86,3 +86,93 @@ Unicode 環境區塊 -> cmd /U 寫 UTF-16LE -> 嚴格 UTF-16LE 解碼
 `cargo fmt --all -- --check` 與 Windows host 四套件的 `cargo clippy --all-targets -- -D warnings` 均 exit 0。`cargo test -p agent-desktop-windows --lib system::launch::` 為 exit 0、24 passed／0 failed，耗時 39.50 秒，上限 300 秒。這是 launch 群組，並非原 8 筆失敗清單或完整 Windows lib。
 
 `pwsh -NoProfile -File tools/dev_check.ps1 -Full` 為 exit 0，46 筆衛生測試及 33 檔差異清單核對通過；npm native binary 不存在，腳本略過狀態檢查。額外執行的檔案大小／註解、plan reference 與 stale-ref constructor source rules 通過。`bash scripts/check-architecture.sh` exit 1，錯誤為 `self-test: G11 did not fire for its planted case in crates/core/src/tree/mod.rs`。從上述 SHA 讀取未修改的 `scripts/check_architecture.py`，只執行其隔離 fixture `self_test()` 也得到相同失敗；此重現不依賴工作樹的測試修正。架構檢查器與 core tree 檔案均無修改。
+
+## 2026-11-15：時限敏感測試剩餘項的量測與處置
+
+程式基準：`87191437`。機器：Windows 11 Pro 10.0.26300，24 邏輯處理器，碼頁 950，環境已設 `AGENT_DESKTOP_HOME`。量測期間桌面無人操作。原始日誌未收進 repo；下列數字都是當次實際輸出。
+
+### 安靜桌面的基線（未改動）
+
+指令：`"C:\Program Files\Git\bin\bash.exe" scripts/cargo-test-isolated-home.sh test -p agent-desktop-windows --lib`，連跑 3 次。
+
+| 次 | exit | passed | failed | ignored | 測試耗時 |
+| --- | --- | --- | --- | --- | --- |
+| 1 | 0 | 1490 | 0 | 6 | 142.39 s |
+| 2 | 0 | 1490 | 0 | 6 | 126.46 s |
+| 3 | 0 | 1490 | 0 | 6 | 136.37 s |
+
+ROADMAP 該列點名的每一筆（剪貼簿兩筆、截圖四筆、殼層 UIA 六筆、`window_opened_fires_for_a_modal…`、`two_simultaneously_open_sheets…`、`contending_holder…`）三次皆 `ok`：安靜桌面的 3 連綠在改動前就出現過一次。但它不穩定，見文末「修正後安靜桌面全量」第 3 次。
+
+### 壓力下重現（24 個 Python 忙迴圈程序，未改動的測試加暫時診斷輸出）
+
+全量 2 次：
+
+| 次 | 失敗數 | 失敗項目與訊息 |
+| --- | --- | --- |
+| 1 | 1 | `shell_surface::tests::start_menu_opens_and_identity_roots_a_tree`：`the start accelerator raises its surface: Timeout`，`elapsed_ms 24499`／`timeout_ms 10000` |
+| 2 | 6 | `shell_surface::tests::action_center_opens_roots_and_closes_cloaked`（`elapsed_ms 21127`／`10000`）；`shell_surface::tests::immersive_surface_absent_from_enumeration_but_yielded_by_uia_root`（`21991`／`10000`）；`screenshot::tests::adapter_screenshot_delegates_to_orchestration`（`10173`／`10000`）；`screenshot::tests::exact_window_without_process_instance_is_invalid_args_not_delivered`（`12325`／`10000`）；`live_surface_tests::surface_dismissed_fires_when_the_already_open_modal_closes_mid_wait`（`UI Automation could not resolve a window root`，`COM HRESULT 0x80131505 (UIA_E_TIMEOUT)`）；`system::wait::tests::already_in_the_requested_state_returns_immediately_reading_the_predicate_once`（predicate 被讀 2 次，預期 1 次） |
+
+只跑名稱含 `clipboard` 的 53 筆（含 1 筆 ignored）、同樣壓力下共 345 輪，5 輪失敗：
+
+| 測試 | 次數 | 訊息 |
+| --- | --- | --- |
+| `fixture_clipboard::tests::contending_holder_is_a_second_process_that_blocks_open` | 1 | `holder releases on request: "clipboard holder did not exit after release"` |
+| 同上 | 1 | `OpenClipboard must succeed after the holder releases` |
+| `input::clipboard::tests::empty_clipboard_returns_ok_none_distinct_from_transport_error` | 2 | `release: "clipboard holder did not exit after release"` |
+| `clipboard_session::tests::write_open_uses_hidden_owner_while_null_owner_leaves_ownership_unset` | 1 | `OpenClipboard(NULL) must succeed for the negative control` |
+
+### (d) `contending_holder…`：兩個成因，皆已修
+
+```text
+測試要的事實：holder 放開剪貼簿
+原本等的事：  holder 子程序在 5 秒內結束        <- 兩者在 CPU 壓力下會分開
+```
+
+1. **釋放被綁在子程序結束時間上。** `ContendingClipboardHolder::release` 原本寫入 `release` 後輪詢 `try_wait` 5 秒，逾時就 kill 並回 `clipboard holder did not exit after release`。暫時加在 fixture 兩端的時間戳顯示：子程序收到要求後通常在數毫秒內就 `CloseClipboard`、`DestroyWindow` 並呼叫 `std::process::exit(0)`，但作業系統把那個程序收掉的時間不受它控制。有時間戳的 960 次釋放中，等待子程序結束的時間有 2 次落在 4.35 s 與 4.56 s（差一點逾時），2 次超過 5 秒而失敗：15.39 s 與 85.66 s，這兩次子程序都在要求後 10 ms 內記下「即將 exit」。卡住時取樣到該程序只剩 1 條執行緒（其中一次讀到 `WaitReason=Executive`），handle 數停在 111 與 114（正常執行時 193～197），連續取樣 1.4～1.7 秒不變。少掉的 83～86 個與參考傾印中無法複製（`DuplicateHandle` 錯誤 50）的 type index 56 handle 數（84 個）相當；推測是結束流程中逐一登出的 ETW 註冊，**這一點是推論，未證實**，核心端為什麼會停這麼久也未查明。
+   修正：`release` 改為等到 holder 的視窗不再是 `GetOpenClipboardWindow()` 的回傳值（上限 30 秒），之後對子程序送 kill 而不等它結束。
+2. **單次 `OpenClipboard`。** 剪貼簿歷史服務在每次寫入後會開啟剪貼簿讀內容。實測讓另一個程序以延遲轉譯持有剪貼簿時，佔住剪貼簿的是 `svchost.exe -k ClipboardSvcGroup -s cbdhsvc` 的 `CLIPBRDWNDCLASS` 視窗（本機 `HKCU\Software\Microsoft\Clipboard\EnableClipboardHistory = 1`）。釋放後與對照組的 `OpenClipboard` 只試一次，壓力下會輸掉這個競態。
+   修正：新增 `open_clipboard_once_free`（沿用 holder 自己開啟時的有界等待），用在釋放後的開啟與 `write_open_uses_hidden_owner…` 的對照組；`!try_open_clipboard(None)`（必須失敗的那一次）維持單次。
+
+回歸測試（`crates/windows/src/tree/fixture/fixture_clipboard_tests.rs`）：
+
+- `a_holder_whose_process_outlives_its_release_still_reports_the_release`：holder 放開後刻意多活 20 秒。
+- `an_open_that_needs_the_clipboard_outwaits_a_transient_opener`：另一條執行緒佔住剪貼簿 300 ms。
+
+先紅後綠採反向驗證：把 `release` 還原成等子程序結束 5 秒、把 `open_clipboard_once_free` 還原成單次嘗試，兩筆皆 FAILED（前者訊息正是原始失敗的 `clipboard holder did not exit after release`，後者為 `the open must succeed once the transient opener lets go`）；還原修正後兩筆皆 ok。
+
+修正後同樣壓力下只跑 `clipboard` 子集：第一輪 150 輪中 1 輪失敗，失敗的是新測試自己的佔用執行緒用了單次開啟（訊息 `the transient opener takes the clipboard`，同一個競態），改用 `open_clipboard_once_free` 後再跑 60 輪，0 輪失敗。原本的三種失敗訊息在修正後的 210 輪中沒有再出現；修正前的發生率約 1.4%（345 輪 5 次），所以這個輪數只能說「沒有再看到」，確定性的依據是上面兩筆回歸測試。
+
+### (a) 剪貼簿「未結束讀取 worker」守門：未重現，成因仍未確認，未改
+
+- 暫時在 `ensure_no_outstanding_worker` 的拒絕路徑與 `read_format_bytes_on_worker` 的逾時路徑寫診斷檔。345 輪子集加 2 次全量壓力測試中，守門拒絕 0 次。記到 1 次呼叫端放棄 worker，查證是診斷本身造成的（worker 已結束，卡在寫診斷檔才送出結果），不算。
+- 會讓守門計數加一的只有 `crates/windows/src/input/clipboard/mod.rs:224`（`WorkerTicket::arm`）。呼叫端只有逾時（`mod.rs:239`）才會在 worker 還活著時返回。測試裡會走到這裡的讀取全部在 `clipboard_test_lock` 之下。
+- 測試內唯一預算短到會逾時的是 `clipboard_tests.rs:170` 的 200 ms 讀取。壓力下量到一般讀取的 worker 存活最長 926 ms，所以它確實可能放棄 worker；但那個 worker 只是在重試 `OpenClipboard`，期限一到就結束，而且同一筆測試後面還有受守門保護的讀取，會先讓它自己失敗，不會留到別的測試。
+- `capture_test_support.rs:163` 的開場讀取會吞掉自己的錯誤（`_ => None`）。若那次讀取逾時，測試主體第一個剪貼簿操作就會被守門拒絕，而且只會發生在 ROADMAP 點名的那兩筆測試。為了驗證，讓外部程序以延遲轉譯（15 秒才回應 `WM_RENDERFORMAT`）持有剪貼簿再跑這兩筆：兩筆都失敗，但訊息是 `OpenClipboard` 競爭逾時（佔用者是上述 `cbdhsvc` 視窗），不是守門。所以這條路徑在本機沒有重現出 11-12 的症狀。
+- 結論：找不到會把 worker 留給別的測試的來源。11-12 的原始失敗輸出沒有保存，無從比對。
+
+### (c) 殼層 UIA live 測試：成因指向產品端呼叫本身，未改
+
+失敗訊息的 `elapsed_ms`（21～24 秒）遠大於測試給的 10 秒：期限檢查是在某一個呼叫返回之後才發生，表示單一呼叫就佔了 20 秒以上。`resolve_immersive`（`crates/windows/src/system/shell/shell_surface_immersive.rs:32`）走訪 UIA 根節點的子元素時不接受期限；另一筆失敗直接帶 `UIA_E_TIMEOUT`。這是 UIA 跨程序呼叫在 CPU 飽和時的行為，期限無法中斷進行中的呼叫。把測試傳入的 10 秒放寬是否足以讓它們通過，這次沒有做對照實驗，所以沒有改。
+
+同一類失敗在安靜桌面也出現了一次（下表第 3 次）：`opening_the_action_center_round_trips_into_the_snapshot` 回 `UI Automation could not read the UIA desktop root's children`、`UIA_E_TIMEOUT`，來源是 `shell_surface_immersive.rs:75`。這筆測試走的是指令自己的預設期限（`DEFAULT_OPERATION_TIMEOUT_MS`，5 秒），不是測試傳入的預算。
+
+### 其他
+
+- `window_opened_fires_for_a_modal…`、`two_simultaneously_open_sheets…`：2 次全量壓力測試都通過，沒有取得失敗訊息，未分析。`wait_event_live_tests.rs` 的 `RECV_TIMEOUT`（20 秒）小於同檔 `WAIT_TIMEOUT_MS`（60 秒），等待若落在兩者之間，測試會先放棄；這是讀程式看到的，未觀察到它造成失敗。
+- 壓力下新看到、ROADMAP 沒列的兩筆：`surface_dismissed_fires_when_the_already_open_modal_closes_mid_wait` 與 `already_in_the_requested_state_returns_immediately_reading_the_predicate_once`，各 1 次，未分析。
+- 截圖項目（含這次看到的兩筆 10 秒預算）依維護者決定，未動。
+
+### 修正後安靜桌面全量
+
+指令同基線。改動只在剪貼簿 fixture 與其測試；要求的 3 次是第 1～3 次，第 3 次失敗後為了看發生率又多跑 3 次。
+
+| 次 | exit | passed | failed | ignored | 測試耗時 |
+| --- | --- | --- | --- | --- | --- |
+| 1 | 0 | 1492 | 0 | 6 | 148.46 s |
+| 2 | 0 | 1492 | 0 | 6 | 151.58 s |
+| 3 | 101 | 1491 | 1 | 6 | 146.03 s |
+| 4 | 0 | 1492 | 0 | 6 | 152.49 s |
+| 5 | 0 | 1492 | 0 | 6 | 186.49 s |
+| 6 | 0 | 1492 | 0 | 6 | 176.45 s |
+
+第 3 次失敗的是 `shell_surface_open::command_live_tests::opening_the_action_center_round_trips_into_the_snapshot`（上面 (c) 的那一筆）。它與這次的改動沒有共用程式碼，但這次沒有另外證明兩者無關。連同基線，安靜桌面 9 次全量中 8 次全綠；「連跑 3 次皆綠」出現過兩段（基線 1～3、修正後 4～6），不是每一段都成立。
