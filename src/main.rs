@@ -162,7 +162,6 @@ fn execute_with_deadline(
             .map_err(pre_dispatch_error)?;
         command_policy::file_path::validate_optional(cli.visual_debug.screenshot.as_deref())
             .map_err(pre_dispatch_error)?;
-        // Reject before context and adapter setup; preflight also guards batch entries.
         command_policy::file_path::validate_command(&cmd).map_err(pre_dispatch_error)?;
     }
     cli.visual_debug.validate(&cmd)?;
