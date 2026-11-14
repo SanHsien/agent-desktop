@@ -136,7 +136,7 @@ ROADMAP 該列點名的每一筆（剪貼簿兩筆、截圖四筆、殼層 UIA �
 回歸測試（`crates/windows/src/tree/fixture/fixture_clipboard_tests.rs`）：
 
 - `a_holder_whose_process_outlives_its_release_still_reports_the_release`：holder 放開後刻意多活 20 秒。
-- `an_open_that_needs_the_clipboard_outwaits_a_transient_opener`：另一條執行緒佔住剪貼簿 300 ms。
+- `an_open_that_needs_the_clipboard_outwaits_a_transient_opener`：另一條執行緒佔住剪貼簿，等主執行緒回報「單次嘗試已做完」後再多佔 200 ms 才放開；所有開啟都先關閉、執行緒先 join，最後才斷言。
 
 先紅後綠採反向驗證：把 `release` 還原成等子程序結束 5 秒、把 `open_clipboard_once_free` 還原成單次嘗試，兩筆皆 FAILED（前者訊息正是原始失敗的 `clipboard holder did not exit after release`，後者為 `the open must succeed once the transient opener lets go`）；還原修正後兩筆皆 ok。
 

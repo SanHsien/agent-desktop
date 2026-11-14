@@ -90,32 +90,46 @@ fn a_holder_whose_process_outlives_its_release_still_reports_the_release() {
 /// Clipboard listeners on a real desktop (history, remote-session sync) open
 /// the clipboard for a moment after every write, so an open that needs the
 /// clipboard has to outwait one instead of failing on a single attempt.
+///
+/// The opener holds the clipboard until this thread reports that its single
+/// attempt has been made, so that attempt meets a held clipboard however
+/// late this thread is scheduled. Every open is closed and the opener joined
+/// before anything is asserted, so a failure leaves the clipboard free.
 #[test]
 fn an_open_that_needs_the_clipboard_outwaits_a_transient_opener() {
     let _lock = clipboard_test_lock();
     let (opened, wait_opened) = channel();
+    let (single_attempt_made, wait_single_attempt) = channel::<()>();
     let opener = spawn(move || {
         let window = message_only_window();
         let held = !window.is_null() && open_clipboard_once_free(Some(window as isize));
         let _ = opened.send(held);
-        std::thread::sleep(Duration::from_millis(300));
+        let _ = wait_single_attempt.recv();
+        std::thread::sleep(Duration::from_millis(200));
         if held {
             close_clipboard();
         }
         unsafe { DestroyWindow(window) };
     });
+    let held = wait_opened.recv().expect("the opener reports");
+    let single_attempt_won = try_open_clipboard(None);
+    if single_attempt_won {
+        close_clipboard();
+    }
+    let _ = single_attempt_made.send(());
+    let waited_open_won = open_clipboard_once_free(None);
+    if waited_open_won {
+        close_clipboard();
+    }
+    opener.join().expect("the opener thread ends");
+
+    assert!(held, "the transient opener takes the clipboard");
     assert!(
-        wait_opened.recv().expect("the opener reports"),
-        "the transient opener takes the clipboard"
-    );
-    assert!(
-        !try_open_clipboard(None),
+        !single_attempt_won,
         "a single attempt loses to the opener, which is what makes the wait necessary"
     );
     assert!(
-        open_clipboard_once_free(None),
+        waited_open_won,
         "the open must succeed once the transient opener lets go"
     );
-    close_clipboard();
-    opener.join().expect("the opener thread ends");
 }
