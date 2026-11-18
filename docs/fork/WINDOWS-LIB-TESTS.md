@@ -176,3 +176,14 @@ ROADMAP 該列點名的每一筆（剪貼簿兩筆、截圖四筆、殼層 UIA �
 | 6 | 0 | 1492 | 0 | 6 | 176.45 s |
 
 第 3 次失敗的是 `shell_surface_open::command_live_tests::opening_the_action_center_round_trips_into_the_snapshot`（上面 (c) 的那一筆）。它與這次的改動沒有共用程式碼，但這次沒有另外證明兩者無關。連同基線，安靜桌面 9 次全量中 8 次全綠；「連跑 3 次皆綠」出現過兩段（基線 1～3、修正後 4～6），不是每一段都成立。
+
+## 2026-11-19：(c) 放寬測試期限的對照實驗
+
+程式基準：`49eb8e47`。24 個 Python 忙迴圈（`while True: pass`）壓在桌面上，指令為 `scripts/cargo-test-isolated-home.sh test -p agent-desktop-windows --lib -- --test-threads=1` 加三個 action-center 測試名（`already_open_surface_returns_without_additional_raise`、`action_center_opens_roots_and_closes_cloaked`、`immersive_surface_absent_from_enumeration…`）；不含 Start Menu 測試。
+
+| 條件 | 輪 | 結果 |
+| --- | --- | --- |
+| 改動前（`open_surface` 期限 10 s） | 6 | 5 輪全綠；第 4 輪 2 筆紅，皆 `Timeout`、`elapsed_ms` 20867／14407、`timeout_ms` 10000；各輪 96～147 s |
+| 期限放寬為 60 s（暫時，已還原） | 2 | 2 輪皆 1 筆紅（248 s、226 s）；已讀到訊息的一輪為 `UI Automation could not read the UIA desktop root's children`、`COM HRESULT 0x80131505 (UIA_E_TIMEOUT)`，不含 `elapsed_ms` |
+
+結論：期限被放寬後失敗沒有消失，改由 UIA 自己的逾時（`UIA_E_TIMEOUT`，來源 `shell_surface_immersive.rs` 的根走訪）回報，所以 10 s 並不是唯一瓶頸，放寬測試期限不足以解決，沒有提交。樣本小（改動後只有 2 輪，另 1 輪的失敗訊息未保存），負載也未必與改動前等同（改動後每輪較慢）；結論是「放寬無效」而非「放寬使情況更糟」。測試端無法再往下調整，屬產品端；見 ROADMAP 該列。
