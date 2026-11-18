@@ -31,7 +31,8 @@ Git 產品差異清單 + 表格
 | `apps/docs/content/docs/commands/app-window.mdx` | launch 的 `APP` 與 `--cwd` 說明加上：Windows 拒絕網路與裝置路徑、`--cwd` 只傳可信目錄（它決定新程序先載入哪份 DLL）、MCP 用戶端不能設 `cwd`，見 ADR-011 | 上游文件涵蓋同樣的警示，或本 fork 取回上游版本 |
 | `apps/docs/content/docs/guides/mcp.mdx` | Security 段改寫：MCP 用戶端等同使用者而非沙盒，列出 `--allow-launch`、`--allow-batch`、`--allow-file-write`、`--allow-cdp` 與永遠生效的限制（`force` 不提供、檔案路徑限制在 session 輸出目錄），見 ADR-011 | 上游 MCP 伺服器自帶等效預設關閉的限制與文件，或本 fork 取回上游版本 |
 | `apps/docs/content/docs/snapshots-and-refs.mdx` | AMBIGUOUS_TARGET 列的建議由「座標點擊可選其一」改為「重新 snapshot 挑唯一控制項，或請人確認」，與錯誤訊息一致，見 ADR-011 | 上游文件與錯誤建議都不再引導 agent 用座標點擊挑選相同控制項 |
-| `apps/docs/pnpm-lock.yaml` | minimatch 10.2.6 升到 11.0.5、`@vercel/geistdocs` 底下的 glob 11.1.0 升到 14.0.4，以修 Dependabot 告警 #5（minimatch < 11.0.1 受影響），見 ADR-010 | 上游 `apps/docs` 的 lockfile 已解到 minimatch >= 11.0.1，且 glob 版本宣告 minimatch ^11 |
+| `apps/docs/package.json` | `next` 16.4.3 升到 16.4.5（Dependabot #1），修 Next.js `use cache` 跨租戶資訊外洩與快取汙染等安全公告（GHSA-mfr8-8qww-v76h、GHSA-vc7v-qv4w-wrv8、GHSA-vvgp-ww4w-46vf） | 上游 `apps/docs` 的 `next` >= 16.4.5 |
+| `apps/docs/pnpm-lock.yaml` | minimatch 10.2.6 升到 11.0.5、`@vercel/geistdocs` 底下的 glob 11.1.0 升到 14.0.4，以修 Dependabot 告警 #5（minimatch < 11.0.1 受影響），見 ADR-010；另隨 `apps/docs/package.json` 把 `next` 解到 16.4.5 | 上游 `apps/docs` 的 lockfile 已解到 minimatch >= 11.0.1 與 `next` >= 16.4.5，且 glob 版本宣告 minimatch ^11 |
 | `apps/docs/pnpm-workspace.yaml` | `overrides` 加 `@vercel/geistdocs>glob: 14.0.4` 與 `minimatch: 11.0.5`（兩者必須一起，只升 minimatch 會讓 glob 11 的萬用字元靜默回空），見 ADR-010 | `@vercel/geistdocs` 自行依賴 glob >= 14 且 `@ts-morph/common` 宣告 minimatch >= 11.0.1，兩條 override 可刪 |
 | `crates/core/src/ref_action/presentation.rs` | 游標疊加的目標中心經 `ProvisionalHandle::for_reads` 讀 bounds（暫定落點 handle 不再是裸 `NativeHandle`） | 上游以型別區分暫定落點與完整解析結果 |
 | `crates/core/src/ref_action/ref_action_poll.rs` | 輪詢迴圈拿到的暫定落點 handle 只經 `for_reads` 交給 actionability 預檢，不能傳進 dispatch | 上游以型別區分暫定落點與完整解析結果 |
