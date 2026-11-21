@@ -3,31 +3,27 @@
   "deferrals": {
     "futures-util": {
       "deferredLatest": "0.3.34",
-      "reason": "Exact pin in crates/linux/Cargo.toml, a file this fork leaves identical to upstream/main (git diff upstream/main HEAD -- crates/linux is empty). No deny.toml or changelog reason is recorded; the only ground is ownership. Reviewed 2026-11-02 at 0.3.34 (docs/fork/DECISIONS.md, ADR-006 point 3)."
-    },
-    "rustix": {
-      "deferredLatest": "1.1.6",
-      "reason": "Exact pin in crates/linux/Cargo.toml, a file this fork leaves identical to upstream/main (git diff upstream/main HEAD -- crates/linux is empty). No deny.toml or changelog reason is recorded; the only ground is ownership. Reviewed 2026-11-02 at 1.1.6 (docs/fork/DECISIONS.md, ADR-006 point 3)."
+      "reason": "Exact pin =0.3.33 in crates/linux/Cargo.toml, a manifest this fork keeps identical to upstream. Re-checked 2026-11-21: upstream/main e8934a5e still pins =0.3.33 (git grep futures-util upstream/main -- crates/linux/Cargo.toml) and crates.io latest is still 0.3.34 (published 2026-08-11). No deny.toml or changelog reason is recorded; the only ground is ownership, and the Linux crate does not compile on the Windows host that gates this fork (docs/fork/DECISIONS.md, ADR-006 point 3 and ADR-013)."
     },
     "zbus": {
-      "deferredLatest": "6.2.1",
-      "reason": "crates/linux pins zbus =5.19.0. deny.toml records why: 5.19 is the newest release with the blocking API the Linux adapter uses, and the three RUSTSEC-2026-0370..0372 ignores go away when the adapter moves to zbus 6. Taken from deny.toml; not re-verified against the zbus 6 changelog. Recorded 2026-11-02 at 6.2.1."
+      "deferredLatest": "6.5.0",
+      "reason": "crates/linux pins zbus =5.19.0, and so does upstream/main e8934a5e (re-checked 2026-11-21). deny.toml records why: 5.19 is the newest release with the blocking API the Linux adapter uses. Checked 2026-11-21 against crates.io metadata: 5.19.0 (2026-08-09) is the newest 5.x and lists a `blocking-api` feature; 6.5.0 (2026-11-20) lists none, and crates/linux/src has 27 `zbus::blocking` uses. The zbus 6 changelog itself was not read. The three RUSTSEC-2026-0370..0372 ignores go away when upstream moves the adapter to zbus 6 (docs/fork/DECISIONS.md, ADR-013)."
     },
     "actions/download-artifact": {
       "deferredLatest": "8.0.2",
-      "reason": "Pin in upstream-owned workflow files that this fork leaves identical to upstream/main on the pinned lines; the floor moves when the fork syncs upstream. Reviewed 2026-11-02 at 8.0.2 (docs/fork/DECISIONS.md, ADR-006 point 3)."
+      "reason": "Pinned at v8.0.1 in release.yml and release-dry-run.yml, upstream-owned workflow files this fork keeps identical to upstream on the pinned lines; the floor moves when the fork syncs upstream. Re-checked 2026-11-21: upstream/main e8934a5e still pins v8.0.1 and the latest release is still 8.0.2 (docs/fork/DECISIONS.md, ADR-006 point 3 and ADR-013)."
     },
     "actions/setup-node": {
       "deferredLatest": "7.1.0",
-      "reason": "Pin in upstream-owned workflow files that this fork leaves identical to upstream/main on the pinned lines; the floor moves when the fork syncs upstream. Reviewed 2026-11-02 at 7.1.0 (docs/fork/DECISIONS.md, ADR-006 point 3)."
+      "reason": "Pinned at v7.0.0 in ci.yml, release.yml, release-dry-run.yml and supply-chain.yml, upstream-owned workflow files this fork keeps identical to upstream on the pinned lines; the floor moves when the fork syncs upstream. Re-checked 2026-11-21: upstream/main e8934a5e still pins v7.0.0 and the latest release is still 7.1.0 (docs/fork/DECISIONS.md, ADR-006 point 3 and ADR-013)."
     },
     "actions/setup-python": {
       "deferredLatest": "7.1.0",
-      "reason": "Pin in upstream-owned workflow files that this fork leaves identical to upstream/main on the pinned lines; the floor moves when the fork syncs upstream. Reviewed 2026-11-02 at 7.1.0 (docs/fork/DECISIONS.md, ADR-006 point 3)."
+      "reason": "Pinned at v7.0.0 in ci.yml, an upstream-owned workflow file this fork keeps identical to upstream on the pinned lines (the fork's own workflows already pin v7.1.0); the floor moves when the fork syncs upstream. Re-checked 2026-11-21: upstream/main e8934a5e still pins v7.0.0 in ci.yml and the latest release is still 7.1.0 (docs/fork/DECISIONS.md, ADR-006 point 3 and ADR-013)."
     },
     "actions/upload-artifact": {
       "deferredLatest": "7.0.2",
-      "reason": "Pin in upstream-owned workflow files that this fork leaves identical to upstream/main on the pinned lines; the floor moves when the fork syncs upstream. Reviewed 2026-11-02 at 7.0.2 (docs/fork/DECISIONS.md, ADR-006 point 3)."
+      "reason": "Pinned at v7.0.1 in release.yml, release-dry-run.yml and windows-capability-probe.yml, upstream-owned workflow files this fork keeps identical to upstream on the pinned lines; the floor moves when the fork syncs upstream. Re-checked 2026-11-21: upstream/main e8934a5e still pins v7.0.1 and the latest release is still 7.0.2 (docs/fork/DECISIONS.md, ADR-006 point 3 and ADR-013)."
     }
   }
 }

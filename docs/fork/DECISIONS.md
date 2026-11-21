@@ -244,3 +244,28 @@
 ## ADR-012: Windows lib 測試逾時裕度的完成條件（2026-11-16）
 
 主人授權小瑪裁決。完成條件以安靜桌面全量並行連跑 3 次皆綠為準；24 忙迴圈壓力下的結果只記錄、不作門檻。截圖類測試的產品預算維持不變，不為壓力測試放寬。殼層 UIA 類先做對照實驗，確認放寬測試傳入的期限是否足夠，不足則歸產品端。重新考慮條件：安靜桌面也持續出現 `UIA_E_TIMEOUT`。
+
+## ADR-013: Supply Chain 的 chrono 告警用升 lock 解，並重整依賴擱置（2026-11-21）
+
+- **日期**：2026-11-21
+- **狀態**：Accepted
+- **觸發**：`Supply Chain` 自 2026-11-18 起每次 push 都失敗（例：run 44870444398），`cargo deny` 報 `RUSTSEC-2026-0543`：chrono 無人維護、所有版本受影響、沒有可升的安全版。同日 `python tools/check_dependency_freshness.py --strict` exit 1：`zbus` 最新 6.5.0 超過 deferral 的 6.2.1，`github/codeql-action` 4.39.4 沒有 deferral。
+- **chrono 從哪裡來**：`cargo tree -i chrono` 只有一條路：`chrono 0.4.45` ← `uiautomation 0.25.0` ← `agent-desktop-windows`。`uiautomation` 0.25.0 的 `src/core.rs` 只用 `chrono::Local::now().timestamp_millis()` 算 matcher 的逾時。本 repo 自己的程式沒有用 chrono。
+- **上游怎麼處理**：上游 `c465134e`（#714，2026-11-17）在 `deny.toml` 加一筆 `RUSTSEC-2026-0543` 例外，理由是當時最新的 `uiautomation 0.25.1` 仍需要 chrono，並寫明「uiautomation 拿掉 chrono 時移除」。這個 commit 不在 `v1.3.1` 內，上游 `main` `e8934a5e` 的 `Cargo.lock` 仍是 `uiautomation 0.25.0`。
+- **決策一：升 `Cargo.lock`，不加例外**。crates.io 的依賴清單顯示 `uiautomation 0.25.2`（2026-11-20）起不再依賴 chrono，0.25.3（2026-11-21）同樣沒有；上游例外寫的移除條件已經成立。`crates/windows/Cargo.toml` 宣告的是 `uiautomation = "0.25"`，所以只動 lock：`uiautomation` 0.25.0 → 0.25.3、`uiautomation_derive` 0.7.8 → 0.7.11、`syn` 3.0.3 → 3.0.10（derive 0.7.10 起要求 `^3.0.10`）、`proc-macro2` 1.0.106 → 1.0.107、`quote` 1.0.45 → 1.0.47；lock 移除 chrono 與只由它帶入的 `iana-time-zone`、`iana-time-zone-haiku`、`android_system_properties`、`num-traits`、`cc`、`find-msvc-tools`、`shlex`。`Cargo.toml` 與 `deny.toml` 都沒改。「無人維護」不是漏洞，例外本身站得住；選升級是因為乾淨的修法存在，而且少一筆要記得回頭刪的例外。
+- **新版剛發佈，所以讀過差異**：0.25.2 與 0.25.3 分別只發佈一天與當天。把 0.25.0 與 0.25.3 的 `src`（以及 derive 0.7.8 與 0.7.11）各自用同一版 rustfmt 正規化後比對，實質差異約 460 行（derive 16 行），逐行讀過：`Into` 實作改寫成 `From`、巢狀 `if let` 改成 let-chain、`transmute` 換成直接轉型、`Ok(unsafe { … })` 拆成兩行、`&Vec<T>` 參數改 `&[T]`、matcher 逾時由 `chrono::Local` 改成 `std::time::Instant`、`VT_ERROR` 與 `VT_HRESULT` 的分支合併。沒有新增網路、檔案或啟動程序的程式碼，兩個 crate 都沒有 `build.rs`。`uiautomation_derive` 是 proc macro，在建置期執行，同樣讀過。沒有做的事：沒有比對 crates.io 上的原始碼與該專案 Git 倉庫的 tag 是否一致，也沒有讀 `syn`、`proc-macro2`、`quote` 的差異。
+- **決策二：`codeql-action` 重釘 v4.39.4**，沿用 ADR-010 決策一的做法（那四行本來就與上游不同，再加 deferral 只會在下一版又失效）。`gh api repos/github/codeql-action/git/ref/tags/v4.39.4` 回 annotated tag `e0462179`，解開得 commit `1bd86f2fdb4b86187fa4059f16f31a3202acc9ea`；release notes 只有一項：預設 CodeQL bundle 升到 2.27.5。
+- **決策三：deferral 重整，由 7 筆變 6 筆**。
+  - `rustix`：刪除。`crates/linux/Cargo.toml` 已是 `=1.1.6`（本 fork 為 RUSTSEC-2026-0486 改的，見 `docs/DIVERGENCE.md`），等於 crates.io 最新版，上游 `main` 現在也釘 `=1.1.6`，沒有東西可擱置。
+  - `zbus`：`deferredLatest` 6.2.1 → 6.5.0。上游 `main` `e8934a5e` 仍釘 `=5.19.0`，所以中期列「跟上游升 zbus 6」沒有觸發。`deny.toml` 的理由這次對照了 crates.io 中繼資料：5.19.0（2026-08-09）是最新的 5.x 且有 `blocking-api` feature，6.5.0（2026-11-20）的 feature 清單沒有它，`crates/linux/src` 有 27 處 `zbus::blocking`。zbus 6 的 changelog 本身沒有讀，所以「6 完全沒有 blocking API」只有 feature 清單這一層證據。
+  - `futures-util`、`actions/download-artifact`、`setup-node`、`setup-python`、`upload-artifact`：維持擱置，`deferredLatest` 不變（最新版自 2026-11-02 沒動），理由補上這次查到的事實：上游 `main` `e8934a5e` 的釘版與本 fork 相同。不升的依據仍是 ADR-006 第 4 點（檔案歸上游，改了日後同步衝突）；`futures-util` 另外無法在 Windows 主機驗證，因為 `agent-desktop-linux` 在這裡不編譯。
+- **之後 deferral 再失效時**：先 `git fetch upstream` 並 `git grep <名稱> upstream/main -- crates/linux/Cargo.toml .github/workflows` 看上游釘版。上游已升就走 commit 軸同步、刪 deferral；上游沒升就把 `deferredLatest` 與理由裡的查核日期、上游 commit 一起更新。只改 `deferredLatest` 不補證據不算數。
+- **合併上游時**：上游的 `RUSTSEC-2026-0543` 例外會隨下一次同步進到 `deny.toml`。那時 `Cargo.lock` 的 `uiautomation` 留在 0.25.3 以上並刪掉那筆例外；若保留，它就成了沒有對象的例外（cargo-deny 對這種例外預期只發警告，這一點沒有實測）。
+- **驗證（Windows 11 本機，Rust 1.89.0，新 lock）**：
+  - `cargo deny --locked check advisories licenses bans sources`（cargo-deny 0.20.2，與 workflow 同版）：`advisories ok, bans ok, licenses ok, sources ok`；`Cargo.lock` 已無 chrono。
+  - `cargo fmt --all -- --check`、主機套件的 `cargo build --locked`、`cargo clippy --locked … --all-targets -- -D warnings`、`cargo check -p agent-desktop-core --all-targets --target x86_64-pc-windows-msvc` 皆 exit 0；`cargo tree -p agent-desktop-core` 不含平台 crate。`pwsh -NoProfile -File tools/dev_check.ps1 -Full` 全綠（衛生測試 46 筆、差異清單 95 路徑）。
+  - `python tools/check_dependency_freshness.py --strict`（帶 `GITHUB_TOKEN`）exit 0：6 筆 `DEFERRED`、0 筆 `REVIEW UPDATE`。
+  - 測試（`scripts/cargo-test-isolated-home.sh`）：`-p agent-desktop-core --lib` 1590 passed／0 failed；`-p agent-desktop` 與 `-p agent-desktop-ffi --tests` 全過；`-p agent-desktop-ffi --lib` 過。
+  - `-p agent-desktop-windows --lib` **沒有全綠**：1488 passed／4 failed／6 ignored（422 s，機器同時有其他工作在跑，CPU 約 39%）。4 筆都是逾時類：`an_expired_deadline_mid_click_posts_corrective_up_with_enrichment`（8 ms 期限，回 `NotDelivered`）、`success_path_includes_process_guard_contention`（lock timeout）、`opening_the_action_center_round_trips_into_the_snapshot` 與 `an_open_shell_surface_resolves_through_the_adapter_seam_and_roots_a_tree`（action center 5 s 期限，實際 6～31 s）。單獨重跑後兩筆通過。另外兩筆用同一台機器、同一時段做新舊 lock 對照：mouse 那筆新 lock 8 次紅 4 次、舊 lock（`uiautomation 0.25.0`）8 次紅 7 次；action center 那筆新舊都是 3 次紅 1 次。舊 lock 一樣紅，所以沒有證據指向這次升級；但「安靜桌面全量連跑 3 次皆綠」（ADR-012）這次沒有達成，也沒有嘗試。
+  - **環境陷阱**：這台機器的使用者環境設了 `AGENT_DESKTOP_HOME`，它優先於測試包裝腳本換掉的 `HOME`，會讓 core 的 session／trace 測試與 `windows_private_file_install` 共用真實資料目錄而失敗（第一次跑 core 7 筆、binary 2 筆紅）。跑測試前要先 `unset AGENT_DESKTOP_HOME`；清掉後上述全過。包裝腳本本身沒改。
+- **重新考慮條件**：`uiautomation` 0.25.2 或 0.25.3 被 yank（`deny.toml` 的 `yanked = "deny"` 會讓 `Supply Chain` 轉紅），或 Windows live 測試出現可歸因於這次升級的行為差異。那時退回 0.25.0 並照上游加例外。
