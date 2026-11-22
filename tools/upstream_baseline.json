@@ -3,11 +3,11 @@
   "branch": "main",
   "track": "release",
   "ticket_cutoff": "release",
-  "reviewed_through": "2b0a7334fc111730454b726e6800aa41cdafc093",
-  "reviewed_release": "v1.2.0",
-  "reviewed_date": "2026-11-10",
-  "reviewed_pr_through": 569,
-  "reviewed_issue_through": 577,
+  "reviewed_through": "b0b7277bea09b770ef9d1fb45aad667bc432cd57",
+  "reviewed_release": "v1.3.1",
+  "reviewed_date": "2026-11-21",
+  "reviewed_pr_through": 680,
+  "reviewed_issue_through": 684,
   "decision_log": "docs/fork/DECISIONS.md",
   "monitored": [
     {"item": "pr#456", "head": "c3732813d41bb2d3e719a8a915006da2c444ec11", "state": "open"},
@@ -16,6 +16,17 @@
     {"item": "pr#543", "head": "f6cdfb22bcb05347a1aba4697186ad14f3db456c", "state": "open"},
     {"item": "pr#483", "head": "a70d017798e20506e0b92b753539ccdd42ba34f8", "state": "open"},
     {"item": "pr#561", "head": "524c1d88884b33d32099842e304b3c635f35fff3", "state": "open"},
-    {"item": "pr#560", "head": "e222c6b50d5c3981188ad7bb9d7e823a2c0d7382", "state": "open"}
+    {"item": "pr#560", "head": "e222c6b50d5c3981188ad7bb9d7e823a2c0d7382", "state": "open"},
+    {"item": "pr#586", "head": "1972bc931337e3a545a62a7ef735a25df7c22637", "state": "open"},
+    {"item": "pr#613", "head": "95d33d62b069429f8934e0bedda70006dcb67647", "state": "open"},
+    {"item": "pr#614", "head": "bf82650ff085f5df0448d11c9deb6ff6b2e9bb36", "state": "open"},
+    {"item": "pr#615", "head": "8848915efb036cd7aef037e4b44e05e1384de420", "state": "open"},
+    {"item": "pr#620", "head": "2820d4602315c48b18b05e9a5d6b88f6f030ac8e", "state": "open"},
+    {"item": "pr#630", "head": "bac85f6b199da8e7289ef63d579ba53a6b478d7d", "state": "open"},
+    {"item": "pr#643", "head": "3e3fe821c11f30059ba36068f666509066f33e8f", "state": "open"},
+    {"item": "pr#645", "head": "7768df302d19b92161e4fe7f386d48766aac2dc0", "state": "open"},
+    {"item": "pr#651", "head": "85917741f4f59b087b6601a3b0970b1830598ccb", "state": "open"},
+    {"item": "pr#655", "head": "89a8f7f7940d45e77cb796d6d03ec6fbc13e4f8f", "state": "open"},
+    {"item": "pr#679", "head": "041254a561da7cf0a60041d3cbe1e4e7c11b4ea0", "state": "open"}
   ]
 }

@@ -269,3 +269,53 @@
   - `-p agent-desktop-windows --lib` **沒有全綠**：1488 passed／4 failed／6 ignored（422 s，機器同時有其他工作在跑，CPU 約 39%）。4 筆都是逾時類：`an_expired_deadline_mid_click_posts_corrective_up_with_enrichment`（8 ms 期限，回 `NotDelivered`）、`success_path_includes_process_guard_contention`（lock timeout）、`opening_the_action_center_round_trips_into_the_snapshot` 與 `an_open_shell_surface_resolves_through_the_adapter_seam_and_roots_a_tree`（action center 5 s 期限，實際 6～31 s）。單獨重跑後兩筆通過。另外兩筆用同一台機器、同一時段做新舊 lock 對照：mouse 那筆新 lock 8 次紅 4 次、舊 lock（`uiautomation 0.25.0`）8 次紅 7 次；action center 那筆新舊都是 3 次紅 1 次。舊 lock 一樣紅，所以沒有證據指向這次升級；但「安靜桌面全量連跑 3 次皆綠」（ADR-012）這次沒有達成，也沒有嘗試。
   - **環境陷阱**：這台機器的使用者環境設了 `AGENT_DESKTOP_HOME`，它優先於測試包裝腳本換掉的 `HOME`，會讓 core 的 session／trace 測試與 `windows_private_file_install` 共用真實資料目錄而失敗（第一次跑 core 7 筆、binary 2 筆紅）。清掉後上述全過。**已解決（2026-11-22）**：`scripts/cargo-test-isolated-home.sh` 現在自行 `unset` `AGENT_DESKTOP_HOME`、`AGENT_DESKTOP_SESSION`、`AGENT_DESKTOP_AGENT_ID`、`AGENT_DESKTOP_MCP_ALLOW`、`AGENT_DESKTOP_MCP_FILE_ROOT`，不必再手動清；`tests/fork/test_isolated_test_wrapper.py` 釘住「呼叫端設的覆寫變數不會傳到 cargo」。修前（變數仍設在環境）core `--lib` 1588 passed／2 failed 加子行程測試失敗，修後 1590 passed／0 failed，`-p agent-desktop` 全過。
 - **重新考慮條件**：`uiautomation` 0.25.2 或 0.25.3 被 yank（`deny.toml` 的 `yanked = "deny"` 會讓 `Supply Chain` 轉紅），或 Windows live 測試出現可歸因於這次升級的行為差異。那時退回 0.25.0 並照上游加例外。
+
+---
+
+## ADR-014: 第三次上游審查，追蹤 v1.3.1（2026-11-21）
+
+- **日期**：2026-11-21
+- **狀態**：Accepted
+- **觸發**：`Upstream check` failure；上游 2026-11-13 發布 `v1.3.1`（`b0b7277`）。
+- **快照**：上游 `main` tip 為 `e8934a5e`；release 軌（`track: release`、`ticket_cutoff: release`）審至 `v1.3.1`（`b0b7277bea09b770ef9d1fb45aad667bc432cd57`）。release 之後的 6 個 main commit 留至下一個 release。PR 軸審至 #680（新增 71 筆）、issue 軸審至 #684（新增 31 筆）。
+- **拒收條件掃描**：71 筆 PR 經逐筆 diff 檢查，零命中拒收特徵（無長串混淆碼、無 `eval(`、無 `new Function(`、無 `global.require`、無長 base64、無零寬控制字元）。
+- **commit 軸（12 筆，`5e0491a` 至 `b0b7277`）**：
+  - `5e0491a`（#376）：延後。改動達 146 檔（+6755/-1343），雖以 macOS 原生選單與生命週期為主要動機，但重構了跨平台 post-action observation、surface target 與 ref owner 機制，更動 `crates/core` 65 檔（不含測試為 39 檔）與 Windows tree 2 檔（`observe.rs`、`surfaces.rs`），並與本 fork ADR-011 差異檔（`crates/core/src/lib.rs`、`refs/resolve_errors.rs`、`refs/resolve_saved_ref.rs`）重疊。因改動巨大且 fork 僅發行 Windows 版，延後至下一次版本整體合併評估。重看觸發條件：下一次上游版本合併、或在 Windows 上重構 surface/observation 機制時。
+  - `b43ac4f`（#573）：不適用。macOS 專屬 libproc 行程清單。
+  - `77149fd`（#589）：略過。文件微調（本機所有帳號皆可觸及 --cdp 連接埠）。
+  - `ab7dfb2`（#602）：延後。修復跨平台 session、trace write budget、wait_event liveness、MCP call cancellation 等邊界狀態機（#597–#601）。上游作者內文自述「Not verified on macOS or Windows」；雖 `git apply --check` 可乾淨套用且與 fork 差異檔無文字衝突，但改動涉及核心狀態機與 `src/mcp/calls.rs`。本 fork 在 ADR-011 剛建置了嚴格的 MCP Confinement 安全邊界，挑揀將增加 15 檔產品差異並破壞 divergence ledger，在缺乏 Windows 實機多 session 併發壓測下直接引入具有狀態機迴歸風險。重看觸發條件：(a) 下一次上游 release 合併時整批評估納入；(b) 本 fork 遇到 #597–#601 任一 issue 表現（如 MCP 取消 call ID 競態或 session 結束 refstore 清理異常）；(c) 在 Windows 實機完成包含 MCP Confinement 與多 session 併發的 live E2E 驗證。
+  - `8e8dd7c`（#622）：略過。apps/docs 升級 TypeScript 7，fork 不發布文件站且依賴已固定。
+  - `c559ecf`（#505）：延後。跨平台 sandbox 命令框架，與本 fork ADR-011 的 MCP 安全隔離（ChildSetup/confinement）強烈衝突，且目前無 Windows sandbox 實作。
+  - `0217868`（#506）：不適用。macOS VM sandbox 實作。
+  - `54855b6`（#642）：略過。單一 post-action 測試 VirtualClock 推進。
+  - `a776595`（#641）：略過。上游 1.3.0 release bump。
+  - `947b051`（#670）：已包含。上游 rustix 1.1.6 修復 RUSTSEC-2026-0486（commit `947b051`），本 fork 在 `crates/linux/Cargo.toml` 與 `docs/DIVERGENCE.md:54` 早已先行釘選 `=1.1.6`（註：ADR-006 當初為 `=1.1.5`，後續在 DIVERGENCE 升級至 1.1.6）。
+  - `2f65070`（#672）：不適用。macOS vmhost.swift 修正。
+  - `b0b7277`（#680）：略過。上游 1.3.1 release bump。
+- **PR 軸（71 筆，#570 至 #680）**：
+  - 10 筆已合進 main（#573、#589、#602、#622、#641、#642、#670、#672、#673、#680），見 commit 軸；#673 為 macOS sandbox host key 限制，不適用。
+  - 1 筆合進堆疊分支（#675 合進 `laf/sandbox-guest-hardening`），macOS guest agent，不適用。
+  - 5 筆關閉未合併（#572、#580、#621、#624、#626）：macOS 專屬、已被取代或不適用。
+  - 55 筆開啟中：其中 Windows 相關重點項目（#586、#613、#614、#615、#620、#630、#634、#643、#645、#646、#651、#655、#662、#663、#679）：
+    - #646（EnumWindows sandbox 失敗）：不採用，本 fork ADR-007 早已實作 `attach_input_desktop()`。
+    - #634 處於 Draft 草稿狀態，不列入 monitored 釘選，等正式就緒或合併。
+    - 其餘 11 筆單一修正（#586、#613、#614、#615、#620、#630、#643、#645、#651、#655、#679）列入 `monitored` 釘住 head 監看，等上游合併。
+    - #662、#663 屬大型跨平台重構堆疊分支，等收口 PR 合併。
+    - 40 筆 macOS/Linux/跨平台 open PR：不碰觸 fork 差異檔，等合併或不適用。
+- **issue 軸（31 筆，#578 至 #684）**：
+  - Windows 相關 issue（共 11 筆）：
+    - #578（Windows Qt modal settings 開啟後逾時不可讀）：監看。無 PR，本機未重現，建議在遇此問題時改以鍵盤動作開啟。
+    - #595（Windows WPF RadioButton 無頭點擊逾時）：等對應 PR #630 合併。
+    - #611（Windows 檔案對話框 combobox SetValue 未同步至子 edit）：不採用（上游 closed as not planned）。上游判定不處理，fork 維持現狀，建議改用鍵盤輸入。
+    - #617（Windows 僅具 SetFocus/ScrollTo 的編輯器未分配 ref）：監看。無 PR，提案建議新增選項分配，現階段改以座標點擊或 `--headed` 操作。
+    - #618（Windows Git Bash shim 殘留 Node launcher）：等對應 PR #613 合併。
+    - #619（Windows cursor overlay 於 npm 安裝因後綴 exe 名稱拒絕啟動）：等對應 PR #614 合併。
+    - #623（Windows 多行程 tray apps 無法存取）：等對應 PR #643 合併。
+    - #644（Windows 11 action-center 以 Win+A 觸發導致逾時）：等對應 PR #645 合併。
+    - #647（Windows wait --text 於深層 Chromium/Electron 節點假陰性逾時）：監看。無 PR，暫以 snapshot 輪詢或 `--wait-for` 搭配 fresh ref 繞過。
+    - #653（Windows 原生 shim 在 non-ASCII 安裝路徑因編碼中斷）：等對應 PR #655 合併。
+    - #677（Windows 11 build 26200 每筆 snapshot 回 Access denied）：監看。無 PR，回報者已重開（reopened），維護機（build 26300）未重現，持續追蹤。
+  - 上游狀態機與核心修復（5 筆）：#597、#598、#599、#600、#601 已由上游 PR #602（commit `ab7dfb21`）修復關閉。
+  - 文件錯誤（1 筆）：#649 open（說明 16 個錯誤碼但表格列 17 個），對應 PR #678 仍 open 未合進 main；本 fork 不發布文件站，等上游合併。
+  - 其餘跨平台／macOS／Linux 專屬或建議項（14 筆）：#581、#593、#605、#607、#608、#609、#625、#627、#629、#648、#652、#654、#656、#674，監看或不適用。
+- **水位**：`reviewed_through` 設為 `b0b7277bea09b770ef9d1fb45aad667bc432cd57`、`reviewed_release` 為 `v1.3.1`、`reviewed_date` 為 `2026-11-21`、`reviewed_pr_through` 為 680、`reviewed_issue_through` 為 684。`monitored` 在既有 7 筆外新增 11 筆 Windows open PR head。
